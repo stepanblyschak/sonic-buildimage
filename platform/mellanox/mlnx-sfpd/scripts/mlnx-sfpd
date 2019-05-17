@@ -120,7 +120,7 @@ class MlnxSfpd:
             raise RuntimeError("sx_api_host_ifc_open exited with error, rc {}".format(rc))
 
         self.user_channel_p.type = SX_USER_CHANNEL_TYPE_FD
-        self.user_channel_p.fd = self.rx_fd_p
+        self.user_channel_p.channel.fd = self.rx_fd_p
 
         rc = sx_api_host_ifc_trap_id_register_set(self.handle,
                                                   SX_ACCESS_CMD_REGISTER,
