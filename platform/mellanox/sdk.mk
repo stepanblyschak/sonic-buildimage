@@ -88,11 +88,12 @@ $(eval $(foreach deb,$(MLNX_SDK_RDEBS),$(call make_url,$(deb))))
 $(eval $(foreach deb,$(PYTHON_SDK_API) $(SX_KERNEL) $(SX_KERNEL_DEV),$(call make_url,$(deb))))
 
 ifneq ($(MLNX_SDK_SOURCE_BASE_URL), )
-SONIC_MAKE_DEBS += $(MLNX_SDK_RDEBS) $(PYTHON_SDK_API) $(SX_KERNEL)
+SONIC_MAKE_DEBS += $(MLNX_SDK_RDEBS) $(PYTHON_SDK_API)
 else
-SONIC_ONLINE_DEBS += $(MLNX_SDK_RDEBS) $(PYTHON_SDK_API) $(SX_KERNEL)
+SONIC_ONLINE_DEBS += $(MLNX_SDK_RDEBS) $(PYTHON_SDK_API)
 endif
 
+SONIC_MAKE_DEBS += $(SX_KERNEL)
 SONIC_STRETCH_DEBS += $(SX_KERNEL)
 
 mlnx-sdk-packages: $(addprefix $(DEBS_PATH)/, $(MLNX_SDK_RDEBS) $(PYTHON_SDK_API) $(SX_KERNEL))
