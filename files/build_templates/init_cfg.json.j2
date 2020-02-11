@@ -16,5 +16,21 @@
             "{{crm_res}}_high_threshold": "85"{% if not loop.last %},{% endif -%}
 {% endfor %}
         }
+    },
+{%- if sonic_asic_platform == "mellanox" %}
+    "WJH": {
+            "global": {
+                "nice_level": "1",
+                "pci_bandwidth": "50",
+                "mode": "debug"
+        }
+    }
+{%- endif %}
+    "FEATURE": {
+{%- if sonic_asic_platform == "mellanox" %}
+        "what-just-happened": {
+            "status": "disabled"
+        }
+{%- endif %}
     }
 }

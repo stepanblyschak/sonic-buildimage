@@ -1,7 +1,22 @@
 #!/bin/bash
 
+{% if docker_container_name == "what-just-happened" %}
+RUN_DIR="/var/run/wjh/"
+DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME="debug_counters.json"
+DEBUG_COUNTERS_CAPABILITIES_DUMP="${RUN_DIR}/${DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME}"
+WJH_RUN_DIR="/var/run/wjh/"
+DEBUG_COUNTERS_CAPABILITIES_DUMP="${WJH_RUN_DIR}/debug_counters.json"
+SONIC_DB_CLI="/usr/local/bin/sonic-db-cli"
+PORT_INIT_DONE_KEY="PORT_TABLE:PortInitDone"
+SLEEP_INTERVAL="1"
+MAX_PORT_INIT_DONE_WAIT="300"
+STATE_DB_SEPERATOR="|"
+DEBUG_COUNTER_CAPABILITIES_TABLE="DEBUG_COUNTER_CAPABILITIES"
+DEBUG_COUNTER_TABLE="DEBUG_COUNTER"
+{% endif %}
+
 # single instance containers are still supported (even though it might not look like it)
-# if no instance number is passed to this script, $DEV will simply be unset, resulting in docker 
+# if no instance number is passed to this script, $DEV will simply be unset, resulting in docker
 # commands being sent to the base container name. E.g. `docker start database$DEV` simply starts
 # the container `database` if no instance number is passed since `$DEV` is not defined
 
@@ -90,6 +105,44 @@ function preStartAction()
     fi
 {%- elif docker_container_name == "snmp" %}
     sonic-db-cli STATE_DB HSET 'DEVICE_METADATA|localhost' chassis_serial_number $(decode-syseeprom -s)
+{%- elif docker_container_name == "what-just-happened" %}
+    mkdir -p "${WJH_RUN_DIR}"
+    if [[ ! -z $("${SONIC_DB_CLI}" CONFIG_DB KEYS "${DEBUG_COUNTER_TABLE}${STATE_DB_SEPERATOR}*") ]];
+    then
+        echo "Found debug counter configuration; debug counters and what just happened are mutually exlusive"
+        exit 1
+    fi
+
+    # Wait for indication that orchagent finished initialization
+    RETRY_COUNT="0"
+    while [[ -z $("${SONIC_DB_CLI}" APPL_DB KEYS "${PORT_INIT_DONE_KEY}") ]];
+    do
+        (( RETRY_COUNT++ )) && sleep "${SLEEP_INTERVAL}"
+        if [[ "${RETRY_COUNT}" -ge "${MAX_PORT_INIT_DONE_WAIT}" ]];
+        then
+            echo "Failed to wait for orchagent to start"
+            exit 1
+        fi
+    done
+
+    sonic-db-cli STATE_DB EVAL "
+    local keys = redis.call(\"KEYS\", KEYS[1] .. \"${STATE_DB_SEPERATOR}*\")
+    local res = {}
+
+    for i,k in pairs(keys) do
+    local sres={}
+
+    local flat_map = redis.call('HGETALL', k)
+    for j = 1, #flat_map, 2 do
+        sres[flat_map[j]] = flat_map[j + 1]
+    end
+    redis.call('DEL', k)
+
+    res[k] = sres
+    end
+
+    return cjson.encode(res)
+    " 1 "${DEBUG_COUNTER_CAPABILITIES_TABLE}" > "${DEBUG_COUNTERS_CAPABILITIES_DUMP}"
 {%- else %}
     : # nothing
 {%- endif %}
@@ -210,7 +263,7 @@ start() {
     if [ -z "$DEV" ]; then
         NET="host"
     else
-        {%- if docker_container_name == "database" %} 
+        {%- if docker_container_name == "database" %}
         NET="bridge"
         {%- else %}
         NET="container:database$DEV"
@@ -237,6 +290,8 @@ start() {
         -v /var/run/hw-management:/var/run/hw-management:rw \
         -v mlnx_sdk_socket:/tmp \
         -v /dev/shm:/dev/shm:rw \
+{%- elif docker_container_name == "what-just-happened" %}
+        -v mlnx_sdk_socket:/tmp \
 {%- else %}
         --tmpfs /tmp \
 {%- endif %}
@@ -272,12 +327,31 @@ stop() {
 {%- endif %}
 }
 
+stopPost() {
+{% if docker_container_name == "what-just-happened" %}
+    [ -f "${DEBUG_COUNTERS_CAPABILITIES_DUMP}" ] && {
+        echo "restoring debug counters capability information to DB..."
+        sonic-db-cli STATE_DB EVAL "
+        local capabilities = cjson.decode(ARGV[1])
+        for stage in pairs(capabilities) do
+            local stage_capability = capabilities[stage]
+            for k in pairs(stage_capability) do
+                redis.call('hset', stage, k, stage_capability[k])
+            end
+        end
+        " 0 $(cat "${DEBUG_COUNTERS_CAPABILITIES_DUMP}")
+    }
+{%- else %}
+    : # nothing
+{%- endif %}
+}
+
 OP=$1
 DEV=$2 # namespace/device number to operate on
 NET_NS="asic" #name of the network namespace
 
 case "$1" in
-    start|wait|stop)
+    start|wait|stop|stopPost)
         $1
         ;;
     updateHostName)
@@ -286,7 +360,7 @@ case "$1" in
         $cmd $@
         ;;
     *)
-        echo "Usage: $0 {start namespace(optional)|wait namespace(optional)|stop namespace(optional)|updateHostName namespace(optional) new_hostname}"
+        echo "Usage: $0 {start namespace(optional)|wait namespace(optional)|stop namespace(optional)|stopPost namespace(optional)|updateHostName namespace(optional) new_hostname}"
         exit 1
         ;;
 esac

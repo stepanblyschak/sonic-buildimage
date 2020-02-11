@@ -1,0 +1,12 @@
+[Unit]
+Description=Container that provides What-Just-Happened feature functionality
+Requires=updategraph.service syncd.service
+After=updategraph.service syncd.service
+Before=ntp-config.service
+
+[Service]
+TimeoutStartSec=120
+ExecStartPre=/usr/bin/{{docker_container_name}}.sh start
+ExecStart=/usr/bin/{{docker_container_name}}.sh wait
+ExecStop=/usr/bin/{{docker_container_name}}.sh stop
+ExecStopPost=/usr/bin/{{docker_container_name}}.sh stopPost
