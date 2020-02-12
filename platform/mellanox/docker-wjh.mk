@@ -29,3 +29,5 @@ $(DOCKER_WJH)_RUN_OPT += --mount type=bind,source=/sys/kernel/debug/,target=/sys
 $(DOCKER_WJH)_RUN_OPT += -v /dev/shm:/dev/shm:rw
 $(DOCKER_WJH)_RUN_OPT += -v /var/run/wjh:/var/run/wjh:rw
 $(DOCKER_WJH)_RUN_OPT += -v /var/log/mellanox:/var/log/mellanox:rw
+
+SONIC_OPTIONAL_DOCKER_CONTAINERS += $($(DOCKER_WJH)_CONTAINER_NAME)

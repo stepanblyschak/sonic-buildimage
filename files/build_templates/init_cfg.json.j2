@@ -1,3 +1,4 @@
+{%- set optional_feature_list = optional_feature | split -%}
 {
     "DEVICE_METADATA": {
         "localhost": {
@@ -17,18 +18,18 @@
 {% endfor %}
         }
     },
-{%- if sonic_asic_platform == "mellanox" %}
+{%- if "what-just-happened" in optional_feature_list %}
     "WJH": {
-            "global": {
-                "nice_level": "1",
-                "pci_bandwidth": "50",
-                "mode": "debug"
+        "global": {
+            "nice_level": "1",
+            "pci_bandwidth": "50",
+            "mode": "debug"
         }
-    }
+    },
 {%- endif %}
     "FEATURE": {
-{%- if sonic_asic_platform == "mellanox" %}
-        "what-just-happened": {
+{%- for feature in optional_feature_list %}
+        "{{ feature }}": {
             "status": "disabled"
         }
 {%- endif %}
