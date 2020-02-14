@@ -1,0 +1,75 @@
+From 5ccc77c39c8f1999d1606097e28254a7ae6d9f86 Mon Sep 17 00:00:00 2001
+From: Stepan Blyschak <stepanb@mellanox.com>
+Date: Fri, 14 Feb 2020 12:28:10 +0200
+Subject: [PATCH 1/1] fix build when kernel sources are split into to
+ directories
+
+Signed-off-by: Stepan Blyschak <stepanb@mellanox.com>
+---
+ bpf/Makefile.bpf | 20 ++++++++++++--------
+ configure.in     |  4 ++++
+ debian/rules     |  2 +-
+ 3 files changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/bpf/Makefile.bpf b/bpf/Makefile.bpf
+index 56d64f1..d46effc 100644
+--- a/bpf/Makefile.bpf
++++ b/bpf/Makefile.bpf
+@@ -20,14 +20,18 @@ INC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
+ linuxhdrs ?= $(KERNEL_SOURCES)
+ SRCARCH ?= $(WJH_ARCH)
+ 
+-LINUXINCLUDE =  -I$(linuxhdrs)/arch/$(SRCARCH)/include \
+-                -I$(linuxhdrs)/arch/$(SRCARCH)/include/generated/uapi \
+-                -I$(linuxhdrs)/arch/$(SRCARCH)/include/generated \
+-                -I$(linuxhdrs)/include \
+-                -I$(linuxhdrs)/arch/$(SRCARCH)/include/uapi \
+-                -I$(linuxhdrs)/include/uapi \
+-                -I$(linuxhdrs)/include/generated/uapi \
+-                -include $(linuxhdrs)/include/linux/kconfig.h
++add_includes =  $(addprefix -I$(dir)/, \
++					arch/$(SRCARCH)/include \
++					arch/$(SRCARCH)/include/generated/uapi \
++					arch/$(SRCARCH)/include/generated \
++					arch/$(SRCARCH)/include/uapi \
++					include \
++					include/uapi \
++					include/generated/uapi)
++
++LINUXINCLUDE := $(foreach dir,$(linuxhdrs),$(add_includes))
++KCONFIG_PATH := $(foreach dir,$(linuxhdrs),$(wildcard $(dir)/include/linux/kconfig.h))
++LINUXINCLUDE += -include $(KCONFIG_PATH)
+ 
+ all: $(OBJS)
+ 
+diff --git a/configure.in b/configure.in
+index 60602ad..cbcd0c8 100644
+--- a/configure.in
++++ b/configure.in
+@@ -117,6 +117,10 @@ if test "x$with_kernel_sources" != xnone; then
+   KERNEL_SOURCES=$with_kernel_sources
+ else
+   KERNEL_SOURCES=/lib/modules/$KERNEL_VERSION/build
++  if [[ -d /lib/modules/$KERNEL_VERSION/source ]];
++  then
++    KERNEL_SOURCES="${KERNEL_SOURCES} /lib/modules/$KERNEL_VERSION/source"
++  fi
+ fi
+ AC_SUBST(KERNEL_SOURCES)
+ 
+diff --git a/debian/rules b/debian/rules
+index 1ad3410..615241e 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -5,7 +5,7 @@ _applibs_folder   ?= ${_prefix}
+ _sxdlibs_folder   ?= ${_prefix}
+ _sxcomplib_folder ?= ${_prefix}
+ KVERSION          ?= $(shell uname -r)
+-K_SRC             ?= "/lib/modules/$(KVERSION)/build"
++K_SRC             ?= "/lib/modules/$(KVERSION)/build /lib/modules/$(KVERSION)/source"
+ WJH_ARCH          ?= x86
+ 
+ %:
+-- 
+1.9.1
+

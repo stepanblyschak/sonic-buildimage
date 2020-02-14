@@ -16,11 +16,13 @@ $(addprefix $(DEST)/, $(MAIN_TARGET)): $(DEST)/% :
 	# build
 	pushd $(PACKAGE_NAME)-$(MLNX_SDK_VERSION)-$(MLNX_SDK_ISSU_VERSION)
 
+	patch -p1 < ../patch/0001-fix-build-when-kernel-sources-are-split-into-to-dire.patch
+
 	if [ -f autogen.sh ]; then
 		./autogen.sh
 	fi
 
-	debuild -b -us -uc -j$(SONIC_CONFIG_MAKE_JOBS)
+	debuild -e KVERSION=$(KVERSION) -b -us -uc -j$(SONIC_CONFIG_MAKE_JOBS)
 
 	popd
 
