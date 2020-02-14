@@ -5,7 +5,7 @@
 {# commands being sent to the base container name. E.g. `docker start database$DEV` simply starts #}
 {# the container `database` if no instance number is passed since `$DEV` is not defined #}
 
-{-% if docker_container_name == "what-just-happened" %}
+{%- if docker_container_name == "what-just-happened" %}
 RUN_DIR="/var/run/wjh/"
 DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME="debug_counters.json"
 DEBUG_COUNTERS_CAPABILITIES_DUMP="${RUN_DIR}/${DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME}"
@@ -18,7 +18,7 @@ MAX_PORT_INIT_DONE_WAIT="90"
 STATE_DB_SEPERATOR="|"
 DEBUG_COUNTER_CAPABILITIES_TABLE="DEBUG_COUNTER_CAPABILITIES"
 DEBUG_COUNTER_TABLE="DEBUG_COUNTER"
-{-% endif %}
+{%- endif %}
 
 {%- if docker_container_name == "database" %}
 link_namespace() {
@@ -327,7 +327,7 @@ stop() {
 }
 
 stopPost() {
-{-% if docker_container_name == "what-just-happened" %}
+{%- if docker_container_name == "what-just-happened" %}
     [ -f "${DEBUG_COUNTERS_CAPABILITIES_DUMP}" ] && {
         echo "restoring debug counters capability information to DB..."
         sonic-db-cli STATE_DB EVAL "

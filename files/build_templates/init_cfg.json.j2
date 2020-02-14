@@ -1,4 +1,4 @@
-{%- set optional_feature_list = optional_feature | split -%}
+{%- set optional_feature_list = optional_features.split(' ') -%}
 {
     "DEVICE_METADATA": {
         "localhost": {
@@ -15,7 +15,7 @@
             "{{crm_res}}_threshold_type": "percentage",
             "{{crm_res}}_low_threshold": "70",
             "{{crm_res}}_high_threshold": "85"{% if not loop.last %},{% endif -%}
-{% endfor %}
+{%- endfor %}
         }
     },
 {%- if "what-just-happened" in optional_feature_list %}
@@ -31,7 +31,7 @@
 {%- for feature in optional_feature_list %}
         "{{ feature }}": {
             "status": "disabled"
-        }
-{%- endif %}
+        }{% if not loop.last %},{% endif -%}
+{%- endfor %}
     }
 }

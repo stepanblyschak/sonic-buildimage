@@ -7,7 +7,9 @@ RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%s
 ## Make apt-get non-interactive
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
+RUN apt-get update && \
+    apt-get install \
+        libelf1
 
 {% if docker_wjh_debs.strip() -%}
 # Copy locally-built Debian package dependencies
