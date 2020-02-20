@@ -26,6 +26,14 @@
             "mode": "debug"
         }
     },
+    "WJH_CHANNEL": {
+        "forwarding": {
+            "type": "raw",
+            "drop_categories": [
+                "L2"
+            ]
+        }
+    },
 {%- endif %}
     "FEATURE": {
 {%- for feature in optional_feature_list %}
