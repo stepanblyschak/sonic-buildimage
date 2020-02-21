@@ -6,11 +6,9 @@
 {# the container `database` if no instance number is passed since `$DEV` is not defined #}
 
 {%- if docker_container_name == "what-just-happened" %}
-RUN_DIR="/var/run/wjh/"
-DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME="debug_counters.json"
-DEBUG_COUNTERS_CAPABILITIES_DUMP="${RUN_DIR}/${DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME}"
 WJH_RUN_DIR="/var/run/wjh/"
-DEBUG_COUNTERS_CAPABILITIES_DUMP="${WJH_RUN_DIR}/debug_counters.json"
+DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME="debug_counters.json"
+DEBUG_COUNTERS_CAPABILITIES_DUMP="${WJH_RUN_DIR}/${DEBUG_COUNTERS_CAPABILITIES_DUMP_NAME}"
 SONIC_DB_CLI="/usr/local/bin/sonic-db-cli"
 PORT_INIT_DONE_KEY="PORT_TABLE:PortInitDone"
 SLEEP_INTERVAL="1"
