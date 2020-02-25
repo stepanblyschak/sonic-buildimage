@@ -5,7 +5,7 @@ MLNX_SDK_ISSU_VERSION = 101
 MLNX_SDK_DEB_VERSION = $(subst _,.,$(MLNX_SDK_VERSION))
 
 # Place here URL where SDK sources exist
-MLNX_SDK_SOURCE_BASE_URL = http://arc-build-server/sdk/sx_sdk_eth-4.3.3052/SOURCES/
+MLNX_SDK_SOURCE_BASE_URL =
 
 ifneq ($(MLNX_SDK_SOURCE_BASE_URL), )
 SDK_FROM_SRC = y
