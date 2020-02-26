@@ -16,8 +16,6 @@ $(addprefix $(DEST)/, $(MAIN_TARGET)): $(DEST)/% :
 	# build
 	pushd $(PACKAGE_NAME)-$(MLNX_SDK_VERSION)-$(MLNX_SDK_ISSU_VERSION)
 
-	patch -p1 < ../patch/0001-fix-build-when-kernel-sources-are-split-into-to-dire.patch
-
 	if [ -f autogen.sh ]; then
 		./autogen.sh
 	fi
