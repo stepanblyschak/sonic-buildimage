@@ -43,32 +43,6 @@ function getMountPoint()
     echo $1 | python -c "import sys, json, os; mnts = [x for x in json.load(sys.stdin)[0]['Mounts'] if x['Destination'] == '/usr/share/sonic/hwsku']; print '' if len(mnts) == 0 else os.path.basename(mnts[0]['Source'])" 2>/dev/null
 }
 
-function updateHostName()
-{
-    HOSTS=/etc/hosts
-    HOSTS_TMP=/etc/hosts.tmp
-
-    EXEC="docker exec -i {{docker_container_name}}$DEV bash -c"
-
-    NEW_HOSTNAME="$1"
-    HOSTNAME=`$EXEC "hostname"`
-    if ! [[ $HOSTNAME =~ ^[a-zA-Z0-9.\-]*$ ]]; then
-        HOSTNAME=`hostname`
-    fi
-
-    # copy HOSTS to HOSTS_TMP
-    $EXEC "cp $HOSTS $HOSTS_TMP"
-    # remove entry with hostname
-    $EXEC "sed -i \"/$HOSTNAME$/d\" $HOSTS_TMP"
-    # add entry with new hostname
-    $EXEC "echo -e \"127.0.0.1\t$NEW_HOSTNAME\" >> $HOSTS_TMP"
-
-    echo "Set hostname in {{docker_container_name}}$DEV container"
-    $EXEC "hostname '$NEW_HOSTNAME'"
-    $EXEC "cat $HOSTS_TMP > $HOSTS"
-    $EXEC "rm -f $HOSTS_TMP"
-}
-
 function getBootType()
 {
     # same code snippet in files/scripts/syncd.sh
@@ -211,11 +185,7 @@ start() {
     {%- else %}
     # Obtain our HWSKU as we will mount directories with these names in each docker
     HWSKU=`sonic-cfggen -d -v 'DEVICE_METADATA["localhost"]["hwsku"]'`
-    HOSTNAME=`sonic-cfggen -d -v 'DEVICE_METADATA["localhost"]["hostname"]'`
     {%- endif %}
-    if [ -z "$HOSTNAME" ] || ! [[ $HOSTNAME =~ ^[a-zA-Z0-9.\-]*$ ]]; then
-        HOSTNAME=`hostname`
-    fi
 
     DOCKERCHECK=`docker inspect --type container {{docker_container_name}}$DEV 2>/dev/null`
     if [ "$?" -eq "0" ]; then
@@ -233,11 +203,6 @@ start() {
             preStartAction
             docker start {{docker_container_name}}$DEV
             postStartAction
-            CURRENT_HOSTNAME="$(docker exec {{docker_container_name}}$DEV hostname)"
-            if [ x"$HOSTNAME" != x"$CURRENT_HOSTNAME" ]; then
-                updateHostName "$HOSTNAME"
-            fi
-            updateHostName "$HOSTNAME"
             exit $?
         fi
 
@@ -272,6 +237,7 @@ start() {
 {%- endif %}
     docker create {{docker_image_run_opt}} \
         --net=$NET \
+        --uts=host \{# W/A: this should be set per-docker, for those dockers which really need host's UTS namespace #}
 {%- if install_debug_image == "y" %}
         -v /src:/src:ro -v /debug:/debug:rw \
 {%- endif %}
@@ -310,7 +276,6 @@ start() {
     preStartAction
     docker start {{docker_container_name}}
     postStartAction
-    updateHostName "$HOSTNAME"
 }
 
 wait() {
@@ -351,13 +316,8 @@ case "$1" in
     start|wait|stop|stopPost)
         $1
         ;;
-    updateHostName)
-        cmd=$1
-        shift 2
-        $cmd $@
-        ;;
     *)
-        echo "Usage: $0 {start namespace(optional)|wait namespace(optional)|stop namespace(optional)|stopPost namespace(optional)|updateHostName namespace(optional) new_hostname}"
+        echo "Usage: $0 {start namespace(optional)|wait namespace(optional)|stop namespace(optional)|stopPost namespace(optional)}"
         exit 1
         ;;
 esac
