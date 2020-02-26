@@ -1,4 +1,5 @@
 {%- set optional_feature_list = optional_features.split(' ') -%}
+{%- set docker_containers_list = docker_containers.split(' ') -%}
 {
     "DEVICE_METADATA": {
         "localhost": {
@@ -43,8 +44,7 @@
 {%- endfor %}
     },
     "CONTAINER_FEATURE": {
-{%- for container in ["bgp", "database", "dhcp_relay", "lldp", "pmon", "radv", "restapi", "sflow",
-                      "snmp", "swss", "syncd", "teamd", "telemetry"] %}
+{%- for container in docker_containers_list %}
         "{{container}}": {
             "auto_restart": "disabled",
             "high_mem_alert": "disabled"
