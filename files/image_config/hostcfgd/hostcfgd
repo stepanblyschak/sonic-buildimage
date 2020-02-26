@@ -233,9 +233,6 @@ class HostConfigDaemon:
         lpbk_table = self.config_db.get_table('LOOPBACK_INTERFACE')
         self.iptables = Iptables()
         self.iptables.load(lpbk_table)
-        feature_table = self.config_db.get_table('FEATURE')
-        for feature, status in feature_table.iteritems():
-            self.feature_status_handler(feature, status)
 
     def aaa_handler(self, key, data):
         self.aaacfg.aaa_update(key, data)
