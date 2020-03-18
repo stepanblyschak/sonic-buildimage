@@ -1,0 +1,4 @@
+wjhd-dbg_1.mlnx.1.0.0_amd64.deb debug extra
+wjhd-dbgsym_1.mlnx.1.0.0_amd64.deb debug optional
+wjhd_1.mlnx.1.0.0_amd64.buildinfo net optional
+wjhd_1.mlnx.1.0.0_amd64.deb net optional
