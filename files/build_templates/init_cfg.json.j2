@@ -1,3 +1,9 @@
+{%- set features = ["sflow", "telemetry"] -%}
+{%- set containers = ["bgp", "database", "dhcp_relay", "lldp", "nat", "pmon", "radv", "restapi", "sflow", "snmp", "swss", "syncd", "teamd", "telemetry"] -%}
+{%- if sonic_asic_platform == "mellanox" -%}
+{%- do features.append("what-just-happened") -%}
+{%- do containers.append("what-just-happened") -%}
+{%- endif -%}
 {
     "DEVICE_METADATA": {
         "localhost": {
@@ -17,16 +23,31 @@
 {% endfor %}
         }
     },
+{#- what-just-happened default configuration section -#}
+{%- if "what-just-happened" in features %}
+    "WJH": {
+        "global": {
+            "nice_level": "1",
+            "pci_bandwidth": "50",
+            "mode": "debug"
+        }
+    },
+    "WJH_CHANNEL": {
+        "forwarding": {
+            "type": "raw",
+            "drop_category_list": "L2,L3,Tunnel"
+        }
+    },
+{%- endif %}
     "FEATURE": {
-{%- for feature in ["sflow", "telemetry"] %}
+{%- for feature in features %}
         "{{feature}}": {
             "status": "disabled"
         }{% if not loop.last %},{% endif -%}
 {% endfor %}
     },
     "CONTAINER_FEATURE": {
-{%- for container in ["bgp", "database", "dhcp_relay", "lldp", "nat", "pmon", "radv", "restapi", "sflow",
-                      "snmp", "swss", "syncd", "teamd", "telemetry"] %}
+{%- for container in containers %}
         "{{container}}": {
             "auto_restart": "disabled",
             "high_mem_alert": "disabled"

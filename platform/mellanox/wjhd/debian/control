@@ -1,0 +1,19 @@
+Source: wjhd
+Priority: optional
+Maintainer: Stepan Blyshchak <stepanb@mellanox.com>
+Build-Depends:wjh-libs
+Standards-Version: 1.0.0
+Section: net
+Homepage: http://www.mellanox.com
+
+Package: wjhd
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: This packege contains what-just-happened functionality for SONiC.
+
+Package: wjhd-dbgsym
+Architecture: any
+Section: debug
+Priority: extra
+Depends: wjhd ${shlibs:Depends}
+Description: Debugging symbols for wjhd
