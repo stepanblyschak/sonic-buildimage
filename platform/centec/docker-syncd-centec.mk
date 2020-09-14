@@ -13,6 +13,8 @@ $(DOCKER_SYNCD_CENTEC)_DEPENDS += $(SYNCD_DBG) \
 SONIC_STRETCH_DOCKERS += $(DOCKER_SYNCD_BASE)
 SONIC_STRETCH_DBG_DOCKERS += $(DOCKER_SYNCD_BASE_DBG)
 
+$(DOCKER_SYNCD_BASE)_VERSION = 1.0.0
+
 $(DOCKER_SYNCD_CENTEC)_RUN_OPT += --privileged -t
 $(DOCKER_SYNCD_CENTEC)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SYNCD_CENTEC)_RUN_OPT += -v /var/run/docker-syncd:/var/run/sswsyncd
