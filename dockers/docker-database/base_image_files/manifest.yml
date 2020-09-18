@@ -1,0 +1,18 @@
+---
+version: 1.0.0
+package:
+  depends:
+  sonic-version: '>=1.0.0'
+service:
+  requires:
+    - docker
+  after:
+    - docker
+    - rc-local
+  asic-service: True
+  host-service: True
+container:
+  privileged: True
+  mounts:
+    - /etc/sonic:/etc/sonic:ro
+
