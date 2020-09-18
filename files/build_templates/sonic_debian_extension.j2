@@ -563,6 +563,7 @@ sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get autor
 {% if file.strip() -%}
 {% set src = file.split(':')[0] -%}
 {% set dst = file.split(':')[1] -%}
+sudo mkdir -p $FILESYSTEM_ROOT/$(dirname {{dst}})/
 sudo cp {{src}} $FILESYSTEM_ROOT/{{dst}}
 {% endif -%}
 {% endfor -%}
