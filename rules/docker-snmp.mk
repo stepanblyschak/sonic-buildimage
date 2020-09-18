@@ -4,6 +4,8 @@ DOCKER_SNMP_STEM = docker-snmp
 DOCKER_SNMP = $(DOCKER_SNMP_STEM).gz
 DOCKER_SNMP_DBG = $(DOCKER_SNMP_STEM)-$(DBG_IMAGE_MARK).gz
 
+$(DOCKER_SNMP)_PACKAGE_NAME = snmp
+
 $(DOCKER_SNMP)_PATH = $(DOCKERS_PATH)/docker-snmp
 
 ## TODO: remove LIBPY3_DEV if we can get pip3 directly
@@ -30,3 +32,4 @@ $(DOCKER_SNMP)_RUN_OPT += --privileged -t
 $(DOCKER_SNMP)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_SNMP)_FILES += $(SUPERVISOR_PROC_EXIT_LISTENER_SCRIPT)
 $(DOCKER_SNMP)_BASE_IMAGE_FILES += monit_snmp:/etc/monit/conf.d
+$(DOCKER_SNMP)_BASE_IMAGE_FILES += manifest.yml:/var/lib/sonic-package-manager/$($(DOCKER_SNMP)_PACKAGE_NAME)/manifest.yml

@@ -1,0 +1,29 @@
+---
+version: 1.0.0
+package:
+  depends:
+    - database >=1.0.0
+    - swss >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: snmp
+  requires:
+    - database
+    - updategraph
+  requisite:
+    - swss
+  after:
+    - database
+    - updategraph
+    - swss
+    - syncd
+  before:
+    - ntp-config
+  asic-service: False
+  host-service: True
+  delayed: True
+container:
+  privileged: True
+  mounts:
+    - /etc/sonic:/etc/sonic:ro
+
