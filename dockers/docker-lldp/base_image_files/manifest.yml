@@ -1,0 +1,26 @@
+---
+version: 1.0.0
+package:
+  depends:
+    - database >=1.0.0
+    - swss >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: lldp
+  requires:
+    - database
+    - updategraph
+  after:
+    - database
+    - updategraph
+    - syncd
+    - swss
+  before:
+    - ntp-config
+  asic-service: True
+  host-service: True
+container:
+  privileged: True
+  mounts:
+    - /etc/sonic:/etc/sonic:ro
+

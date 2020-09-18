@@ -4,6 +4,8 @@ DOCKER_LLDP_STEM = docker-lldp
 DOCKER_LLDP = $(DOCKER_LLDP_STEM).gz
 DOCKER_LLDP_DBG = $(DOCKER_LLDP_STEM)-$(DBG_IMAGE_MARK).gz
 
+$(DOCKER_LLDP)_PACKAGE_NAME = lldp
+
 $(DOCKER_LLDP)_PATH = $(DOCKERS_PATH)/docker-lldp
 
 $(DOCKER_LLDP)_DEPENDS += $(LLDPD) $(LIBSWSSCOMMON) $(PYTHON_SWSSCOMMON)
@@ -31,4 +33,5 @@ $(DOCKER_LLDP)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_LLDP)_BASE_IMAGE_FILES += lldpctl:/usr/bin/lldpctl
 $(DOCKER_LLDP)_BASE_IMAGE_FILES += lldpcli:/usr/bin/lldpcli
 $(DOCKER_LLDP)_BASE_IMAGE_FILES += monit_lldp:/etc/monit/conf.d
+$(DOCKER_LLDP)_BASE_IMAGE_FILES += manifest.yml:/var/lib/sonic-package-manager/$($(DOCKER_LLDP)_PACKAGE_NAME)/manifest.yml
 $(DOCKER_LLDP)_FILES += $(SUPERVISOR_PROC_EXIT_LISTENER_SCRIPT)
