@@ -1,0 +1,30 @@
+---
+version: 1.0.0
+package:
+  name: {{ name }}
+  version: {{ version }}
+  depends:
+    - database >=1.0.0
+    - swss >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: telemetry
+  requires:
+    - database
+    - updategraph
+  after:
+    - database
+    - updategraph
+    - swss
+    - syncd
+  before:
+    - ntp-config
+  asic-service: False
+  host-service: True
+  delayed-service: True
+container:
+  privileged: True
+  volumes:
+    - /etc/sonic:/etc/sonic:ro
+    - /var/run/dbus:/var/run/dbus:rw
+
