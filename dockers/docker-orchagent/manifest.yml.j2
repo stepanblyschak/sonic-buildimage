@@ -1,0 +1,32 @@
+---
+version: 1.0.0
+package:
+  name: {{ name }}
+  version: {{ version }}
+  depends:
+    - database >=1.0.0
+    - syncd >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: swss
+  requires:
+    - database
+    - updategraph
+  after:
+    - database
+    - updategraph
+    - interface-config
+  before:
+    - ntp-config
+  peer: syncd
+  asic-service: True
+  host-service: False
+container:
+  privileged: True
+  volumes:
+    - /etc/network/interfaces:/etc/network/interfaces:ro
+    - /etc/network/interfaces.d/:/etc/network/interfaces.d/:ro
+    - /host/machine.conf:/host/machine.conf:ro
+    - /etc/sonic:/etc/sonic:ro
+    - /var/log/swss:/var/log/swss:rw
+
