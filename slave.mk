@@ -705,6 +705,9 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 		$(eval export $(subst -,_,$(notdir $($*.gz_PATH)))_whls=$(shell printf "$(subst $(SPACE),\n,$(call expand,$($*.gz_PYTHON_WHEELS)))\n" | awk '!a[$$0]++'))
 		$(eval export $(subst -,_,$(notdir $($*.gz_PATH)))_dbgs=$(shell printf "$(subst $(SPACE),\n,$(call expand,$($*.gz_DBG_PACKAGES)))\n" | awk '!a[$$0]++'))
 		j2 $($*.gz_PATH)/Dockerfile.j2 > $($*.gz_PATH)/Dockerfile
+		if [ -f $($*.gz_PATH)/manifest.yml.j2 ]; then
+			name=$($*.gz_PACKAGE_NAME) version=$($*.gz_VERSION) j2 $($*.gz_PATH)/manifest.yml.j2 > $($*.gz_PATH)/manifest.yml
+		fi
 		docker info $(LOG)
 		docker build --squash --no-cache \
 			--build-arg http_proxy=$(HTTP_PROXY) \
