@@ -6,6 +6,8 @@ DOCKER_SNMP_DBG = $(DOCKER_SNMP_STEM)-$(DBG_IMAGE_MARK).gz
 
 $(DOCKER_SNMP)_PATH = $(DOCKERS_PATH)/docker-snmp
 
+$(DOCKER_SNMP)_PACKAGE_NAME = snmp
+
 ## TODO: remove LIBPY3_DEV if we can get pip3 directly
 $(DOCKER_SNMP)_DEPENDS += $(SNMP) $(SNMPD)
 
