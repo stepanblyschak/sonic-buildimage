@@ -1,0 +1,30 @@
+---
+version: 1.0.0
+package:
+  name: {{ name }}
+  version: {{ version }}
+  depends:
+    - database >=1.0.0
+    - syncd >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: dhcp-relay
+  requires:
+    - database
+    - updategraph
+  after:
+    - swss
+    - syncd
+    - teamd
+  before:
+    - ntp-config
+  dependent-of:
+    - swss
+  asic-service: False
+  host-service: True
+  user: admin
+container:
+  privileged: True
+  volumes:
+    - /etc/sonic:/etc/sonic:ro
+
