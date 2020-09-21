@@ -1,0 +1,32 @@
+---
+version: 1.0.0
+package:
+  name: {{ name }}
+  version: {{ version }}
+  depends:
+    - database >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: pmon
+  requires:
+    - database
+    - updategraph
+  after:
+    - database
+    - syncd
+    - updategraph
+  before:
+    - ntp-config
+  asic-service: False
+  host-service: True
+container:
+  privileged: True
+  volumes:
+    - /etc/sonic:/etc/sonic:ro
+{%- if image_type == 'aboot' %}
+    - /usr/lib/python2.7/dist-packages/arista:/usr/lib/python2.7/dist-packages/arista:ro
+    - /usr/lib/python3/dist-packages/arista:/usr/lib/python3/dist-packages/arista:ro
+    - /usr/lib/python2.7/dist-packages/sonic_platform:/usr/lib/python2.7/dist-packages/sonic_platform:ro
+    - /usr/lib/python3/dist-packages/sonic_platform:/usr/lib/python3/dist-packages/sonic_platform:ro
+{%- endif %}
+
