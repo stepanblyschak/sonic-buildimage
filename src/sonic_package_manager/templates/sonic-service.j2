@@ -1,0 +1,41 @@
+#
+# =============== Managed by SONiC Package Manager. DO NOT EDIT! ===============
+# generated from /usr/share/sonic/templates/sonic-service.j2 using sonic-package-manager
+#
+{%- if name != 'database' %}
+{%- set path = '/usr/local/bin' %}
+{%- else %}
+{%- set path = '/usr/bin' %}
+{%- endif %}
+[Unit]
+Description={{ description }}
+{%- for service in requires %}
+Requires={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
+{%- endfor %}
+{%- for service in requisite %}
+Requisite={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
+{%- endfor %}
+{%- for service in after %}
+After={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
+{%- endfor %}
+{%- for service in before %}
+Before={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
+{%- endfor %}
+Before=ntp-config.service
+StartLimitIntervalSec=1200
+StartLimitBurst=3
+
+[Service]
+User={{ user|default("root") }}
+Environment=sonic_asic_platform={{ sonic_asic_platform }}
+ExecStartPre={{path}}/{{name}}.sh start{% if multi_instance == 'true' %} %i{% endif %}
+ExecStart={{path}}/{{name}}.sh wait{% if multi_instance == 'true' %} %i{% endif %}
+ExecStop={{path}}/{{name}}.sh stop{% if multi_instance == 'true' %} %i{% endif %}
+Restart=always
+RestartSec=30
+{%- if name == "syncd" %}
+TimeoutStartSec=150
+{%- endif %}
+
+[Install]
+WantedBy=multi-user.target
