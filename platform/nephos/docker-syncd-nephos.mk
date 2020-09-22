@@ -3,6 +3,7 @@
 DOCKER_SYNCD_PLATFORM_CODE = nephos
 include $(PLATFORM_PATH)/../template/docker-syncd-base.mk
 
+$(DOCKER_SYNCD_BASE)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_BASE)_DEPENDS += $(SYNCD)
 $(DOCKER_SYNCD_BASE)_FILES += $(DSSERVE) $(NPX_DIAG)
 
