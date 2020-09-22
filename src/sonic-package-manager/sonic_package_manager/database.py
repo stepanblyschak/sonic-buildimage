@@ -80,5 +80,5 @@ class PackageDatabase:
     def get_package_metadata_folder(package):
         ''' Return a base path for package. '''
 
-        return self.get_sonic_package_base_dir(package.get_name())
+        return PackageDatabase.get_sonic_package_base_dir(package.get_name())
 
