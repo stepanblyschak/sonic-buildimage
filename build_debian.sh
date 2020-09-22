@@ -452,6 +452,7 @@ sudo tee $FILESYSTEM_ROOT/etc/sonic/sonic_version.yml > /dev/null <<EOF
 build_version: '${SONIC_IMAGE_VERSION}'
 debian_version: '$(cat $FILESYSTEM_ROOT/etc/debian_version)'
 kernel_version: '$kversion'
+base_os_compatibility_version: ${BASE_OS_COMPATIBILITY_VERSION}
 asic_type: $sonic_asic_platform
 commit_id: '$(git rev-parse --short HEAD)'
 build_date: $(date -u)
