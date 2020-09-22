@@ -483,6 +483,9 @@ sudo cp $BUILD_TEMPLATES/mgmt-framework.timer $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_S
 echo "mgmt-framework.timer" | sudo tee -a $GENERATED_SERVICE_FILE
 {% endif %}
 
+sudo cp $BUILD_TEMPLATES/pmon.timer $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM
+echo "pmon.timer" | sudo tee -a $GENERATED_SERVICE_FILE
+
 sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get purge -y python-dev
 sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get clean -y
 sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get autoremove -y

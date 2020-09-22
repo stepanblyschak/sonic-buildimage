@@ -5,6 +5,7 @@ After=updategraph.service
 {% if sonic_asic_platform == 'mellanox' %}
 After=syncd.service
 {% endif %}
+Conflicts=pmon.timer
 Before=ntp-config.service
 StartLimitIntervalSec=1200
 StartLimitBurst=3
@@ -17,5 +18,3 @@ ExecStop=/usr/bin/{{docker_container_name}}.sh stop
 Restart=always
 RestartSec=30
 
-[Install]
-WantedBy=multi-user.target

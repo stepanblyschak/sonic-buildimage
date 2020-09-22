@@ -1,0 +1,11 @@
+[Unit]
+Description=Delays platform monitoring container until SONiC has started
+Conflicts=pmon.service
+
+[Timer]
+OnUnitActiveSec=0 sec
+OnBootSec=3min 30 sec
+Unit=pmon.service
+
+[Install]
+WantedBy=timers.target
