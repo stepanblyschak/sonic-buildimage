@@ -1,6 +1,7 @@
 # docker image for mrvl syncd with rpc
 
 DOCKER_SYNCD_MRVL_RPC = docker-syncd-mrvl-rpc.gz
+$(DOCKER_SYNCD_MRVL_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_MRVL_RPC)_PATH = $(PLATFORM_PATH)/docker-syncd-mrvl-rpc
 $(DOCKER_SYNCD_MRVL_RPC)_DEPENDS += $(SYNCD_RPC) $(LIBTHRIFT) $(PTF)
 $(DOCKER_SYNCD_MRVL_RPC)_FILES += $(SUPERVISOR_PROC_EXIT_LISTENER_SCRIPT)
