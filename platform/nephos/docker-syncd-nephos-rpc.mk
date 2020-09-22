@@ -1,6 +1,7 @@
 # docker image for nephos syncd with rpc
 
 DOCKER_SYNCD_NEPHOS_RPC = docker-syncd-nephos-rpc.gz
+$(DOCKER_SYNCD_NEPHOS_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_NEPHOS_RPC)_PATH = $(PLATFORM_PATH)/docker-syncd-nephos-rpc
 $(DOCKER_SYNCD_NEPHOS_RPC)_DEPENDS += $(SYNCD_RPC) $(LIBTHRIFT) $(PTF)
 ifeq ($(INSTALL_DEBUG_TOOLS), y)
