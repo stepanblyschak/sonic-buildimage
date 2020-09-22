@@ -1,6 +1,7 @@
 # docker image for innovium syncd with rpc
 
 DOCKER_SYNCD_INVM_RPC = docker-syncd-invm-rpc.gz
+$(DOCKER_SYNCD_INVM_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_INVM_RPC)_PATH = $(PLATFORM_PATH)/docker-syncd-invm-rpc
 $(DOCKER_SYNCD_INVM_RPC)_DEPENDS += $(SYNCD_RPC) $(LIBTHRIFT) $(INVM_LIBSAI) $(PTF)
 $(DOCKER_SYNCD_INVM_RPC)_LOAD_DOCKERS += $(DOCKER_SYNCD_BASE)

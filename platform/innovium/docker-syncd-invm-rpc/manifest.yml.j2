@@ -1,0 +1,28 @@
+---
+version: 1.0.0
+package:
+  name: {{ name }}
+  version: {{ version }}
+  depends:
+    - database >=1.0.0
+  sonic-version: ">=1.0.0"
+service:
+  name: syncd
+  requires:
+    - database
+    - updategraph
+  after:
+    - database
+    - updategraph
+    - interface-config
+  before:
+    - ntp-config
+  asic-service: True
+  host-service: False
+container:
+  privileged: True
+  volumes:
+    - /host/warmboot:/var/warmboot
+    - /etc/sonic:/etc/sonic:ro
+    - /host/machine.conf:/etc/machine.conf
+
