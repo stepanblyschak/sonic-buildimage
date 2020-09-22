@@ -1,6 +1,7 @@
 # docker image for mlnx syncd with rpc
 
 DOCKER_SYNCD_MLNX_RPC = docker-syncd-mlnx-rpc.gz
+$(DOCKER_SYNCD_MLNX_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_MLNX_RPC)_PATH = $(PLATFORM_PATH)/docker-syncd-mlnx-rpc
 $(DOCKER_SYNCD_MLNX_RPC)_DEPENDS += $(SYNCD_RPC) $(LIBTHRIFT) $(PTF)
 $(DOCKER_SYNCD_MLNX_RPC)_FILES += $(SUPERVISOR_PROC_EXIT_LISTENER_SCRIPT)
