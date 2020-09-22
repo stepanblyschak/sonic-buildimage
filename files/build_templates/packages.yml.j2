@@ -1,0 +1,17 @@
+---
+{% for docker_installation_target in installer_images.strip().split(' ') -%}
+{% if docker_installation_target -%}
+{% set pkgname, docker_build_path, image = docker_installation_target.split('|') -%}
+{% set imagefilepath = image.split(':')|first -%}
+{% set imageversion = image.split(':')|last -%}
+{% set imagefilename = imagefilepath.split('/')|last -%}
+{% set imagename = imagefilename.split('.')|first -%}
+{% if pkgname -%}
+{{ pkgname }}:
+  repository: {{ imagename }}
+  default-version: {{ imageversion }}
+  essential: True
+{% endif -%}
+{% endif -%}
+{% endfor -%}
+

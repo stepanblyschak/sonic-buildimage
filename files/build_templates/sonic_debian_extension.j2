@@ -503,11 +503,12 @@ sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS ta
 {% endfor %}
 
 ## Prepare sonic-package-manager directory
+SPM_DIR=$FILESYSTEM_ROOT/var/lib/sonic-package-manager/
 {% for docker_installation_target in installer_images.strip().split(' ') -%}
 {% if docker_installation_target %}
 {% set pkgname, docker_build_path, image = docker_installation_target.split('|') %}
 {% if pkgname %}
-SPM_PKG_DIR=$FILESYSTEM_ROOT/var/lib/sonic-package-manager/{{pkgname}}/
+SPM_PKG_DIR=$SPM_DIR/{{pkgname}}/
 sudo mkdir -p $SPM_PKG_DIR
 if [[ -f {{docker_build_path}}/manifest.yml ]]; then
     sudo cp {{docker_build_path}}/manifest.yml $SPM_PKG_DIR/manifest.yml
@@ -515,6 +516,9 @@ fi
 {% endif %}
 {% endif %}
 {% endfor %}
+
+## Generate SONiC default packages.json
+j2 $BUILD_TEMPLATES/packages.yml.j2 | sudo tee $SPM_DIR/packages.yml
 
 {% if include_kubernetes == "y" %}
 ## Pull in kubernetes docker images
