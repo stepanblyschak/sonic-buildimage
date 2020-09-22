@@ -814,6 +814,7 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
         $(if $(findstring y,$(ENABLE_ZTP)),$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(SONIC_ZTP))) \
         $(if $(findstring y,$(INCLUDE_HOST_SERVICE)),$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(SONIC_HOST_SERVICE))) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_UTILITIES_PY2)) \
+        $(addprefix $(PYTHON_DEBS_PATH)/,$(SONIC_PACKAGE_MANAGER)) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY2)) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY3)) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_CONFIG_ENGINE_PY2)) \
