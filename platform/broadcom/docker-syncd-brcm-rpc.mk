@@ -1,6 +1,7 @@
 # docker image for brcm syncd with rpc
 
 DOCKER_SYNCD_BRCM_RPC = docker-syncd-brcm-rpc.gz
+$(DOCKER_SYNCD_BRCM_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_BRCM_RPC)_PATH = $(PLATFORM_PATH)/docker-syncd-brcm-rpc
 $(DOCKER_SYNCD_BRCM_RPC)_DEPENDS += $(SYNCD_RPC) $(LIBTHRIFT) $(PTF)
 ifeq ($(INSTALL_DEBUG_TOOLS), y)
