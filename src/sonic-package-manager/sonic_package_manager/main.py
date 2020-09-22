@@ -11,9 +11,11 @@ import installer
 from sonic_package_manager.errors import *
 from sonic_package_manager.installer import PackageInstallation
 
+
 @click.group()
 def cli():
     pass
+
 
 @cli.command()
 def list():
@@ -31,6 +33,7 @@ def list():
         ])
     print(tabulate.tabulate(table_body, table_header))
 
+
 @cli.command()
 @click.argument("name")
 def describe(name):
@@ -43,9 +46,13 @@ def describe(name):
     except PackageManagerError as err:
         click.secho("Failed to describe package {}: {}".format(name, err), fg="red")
 
+
 @cli.command()
 @click.argument("name")
 def install(name):
+    if os.geteuid() != 0:
+        click.secho("Root privileges required for this operation", fg="red")
+        raise click.Abort()
     try:
         installation = PackageInstallation(name)
         installation.install_package()
@@ -53,9 +60,13 @@ def install(name):
         click.secho("Failed to install package {}: {}".format(name, err), fg="red")
         return
 
+
 @cli.command()
 @click.argument("name")
 def uninstall(name):
+    if os.geteuid() != 0:
+        click.secho("Root privileges required for this operation", fg="red")
+        raise click.Abort()
     try:
         installation = PackageInstallation(name)
         installation.uninstall_package()
