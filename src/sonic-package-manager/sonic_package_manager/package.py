@@ -78,7 +78,7 @@ class Package:
         return None
 
     def status(self):
-        ''' Tell the package status - Installed/Not Installed/Built-In. ''''
+        ''' Tell the package status - Installed/Not Installed/Built-In. '''
 
         if self.is_builtin():
             return "Built-In"

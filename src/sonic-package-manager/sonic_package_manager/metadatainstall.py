@@ -68,8 +68,6 @@ class MetadataInstall(Operation):
 
         try:
             shutil.rmtree(PackageDatabase.get_package_metadata_folder(self._package))
-        except FileNotFoundError:
-            pass
         except OSError as err:
             raise PackageInstallationError('Failed to remove package metadat: {}'.format(err))
 
