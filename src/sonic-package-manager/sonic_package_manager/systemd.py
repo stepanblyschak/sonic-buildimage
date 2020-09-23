@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
+''' This module implements an Operation that integrates the package with systemd. '''
 
 import os
 import stat
@@ -11,6 +11,7 @@ from sonic_py_common.device_info import get_sonic_version_info
 from sonic_package_manager.operation import Operation
 from sonic_package_manager.logger import get_logger
 from sonic_package_manager.errors import PackageInstallationError
+
 
 class TemplateGenerator:
     ''' Base class with helper utilities to render j2 templates. '''
@@ -42,10 +43,6 @@ class SystemdGenerator(TemplateGenerator, Operation):
     DOCKER_CTL_SCRIPT_TEMPLATE   = '/usr/share/sonic/templates/docker_image_ctl.j2'
     DOCKER_CTL_SCRIPT_LOCALTION  = '/usr/bin/'
 
-    def __init__(self, database, package):
-        self._database = database
-        self._package = package
-
     @staticmethod
     def get_service_file_path(package):
         return os.path.join(SystemdGenerator.SERVICE_FILE_LOCATION,
@@ -75,6 +72,17 @@ class SystemdGenerator(TemplateGenerator, Operation):
         if proc.returncode != 0:
             raise PackageInstallationError("Failed to execute 'systemctl daemon-reload'")
 
+    def __init__(self, database, package):
+        ''' Initialize SystemdGenerator.
+
+        Args:
+            database (PackageDatabase): SONiC PackageDatabase instance.
+            package (Package): SONiC Package instance to install.
+        '''
+
+        self._database = database
+        self._package = package
+
     def _generate_systemd_service(self, package):
         ''' Generate systemd configuration for SONiC package
         TODO: service name
@@ -82,9 +90,10 @@ class SystemdGenerator(TemplateGenerator, Operation):
         TODO: user for services
         '''
 
-        manifest = package.get_manifest()
-        service_props = manifest.get('service', dict())
+        manifest            = package.get_manifest()
+        service_props       = manifest.get('service', dict())
         sonic_asic_platform = get_sonic_version_info()['asic_type']
+        is_asic_service     = service_props.get('asic-service', False)
 
         description = package.get_description()
         name = package.get_name()
@@ -93,33 +102,34 @@ class SystemdGenerator(TemplateGenerator, Operation):
         after = []
         before = []
 
-        for servicelist, services in dict(
-                requires=requires,
-                requisite=requisite,
-                after=after,
-                before=before).iteritems():
-            for service in service_props.get(servicelist, []):
-                services.append(
-                    dict(
-                        name=service,
-                        is_package=self._database.has_package(service)
-                    )
-                )
+        unit_attributes = dict(
+            requires=requires,
+            requisite=requisite,
+            after=after,
+            before=before
+        )
 
-        is_asic_service = service_props.get('asic-service', False)
+        for unit_attribute, services in unit_attributes.iteritems():
+            for unit in service_props.get(unit_attribute, []):
+                unitinfo = dict(
+                    name=unit,
+                    is_package=self._database.has_package(unit)
+                )
+                services.append(service_info)
+
 
         outputfile = SystemdGenerator.get_service_file_path(package)
         SystemdGenerator.render_template(self.SERVICE_FILE_TEMPLATE,
             outputfile,
             {
-                'description': description,
-                'name': name,
-                'requires': requires,
-                'requisite': requisite,
-                'after': after,
-                'before': before,
+                'description'        : description,
+                'name'               : name,
+                'requires'           : requires,
+                'requisite'          : requisite,
+                'after'              : after,
+                'before'             : before,
                 'sonic_asic_platform': sonic_asic_platform,
-                'multi_instance': False,
+                'multi_instance'     : False,
             }
         )
         get_logger().info('Installed {}'.format(outputfile))
@@ -129,14 +139,14 @@ class SystemdGenerator(TemplateGenerator, Operation):
             SystemdGenerator.render_template(self.SERVICE_FILE_TEMPLATE,
                 outputfile,
                 {
-                    'description': description,
-                    'name': name,
-                    'requires': requires,
-                    'requisite': requisite,
-                    'after': after,
-                    'before': before,
+                    'description'        : description,
+                    'name'               : name,
+                    'requires'           : requires,
+                    'requisite'          : requisite,
+                    'after'              : after,
+                    'before'             : before,
                     'sonic_asic_platform': sonic_asic_platform,
-                    'multi_instance': True,
+                    'multi_instance'     : False,
                 }
             )
             get_logger().info('Installed {}'.format(outputfile))
@@ -171,11 +181,11 @@ class SystemdGenerator(TemplateGenerator, Operation):
         SystemdGenerator.render_template(self.SERVICE_MGMT_SCRIPT_TEMPLATE,
             SystemdGenerator.get_service_mgmt_script_path(package),
             {
-                'dependent_services': dependent_services,
+                'dependent_services'          : dependent_services,
                 'multiasic_dependent_services': multiasic_dependent_services,
-                'peer_service_name': peer_service_name,
-                'service_name': service_name,
-                'sonic_asic_platform': sonic_asic_platform,
+                'peer_service_name'           : peer_service_name,
+                'service_name'                : service_name,
+                'sonic_asic_platform'         : sonic_asic_platform,
             }
         )
 
@@ -222,9 +232,9 @@ class SystemdGenerator(TemplateGenerator, Operation):
             SystemdGenerator.get_docker_ctl_script_path(package),
             {
                 'docker_container_name': name,
-                'docker_image_name': repository,
-                'docker_image_run_opt': ' '.join(run_opt),
-                'sonic_asic_platform': sonic_asic_platform,
+                'docker_image_name'    : repository,
+                'docker_image_run_opt' : ' '.join(run_opt),
+                'sonic_asic_platform'  : sonic_asic_platform,
             }
         )
 
