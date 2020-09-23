@@ -3,7 +3,6 @@
 ''' This module implements Docker Image pulling. '''
 
 import docker
-import tqdm
 import click
 
 from sonic_package_manager.operation import Operation
