@@ -51,7 +51,7 @@ function wait_for_database_service()
 
 function getBootType()
 {
-    # same code snippet in files/build_templates/docker_image_ctl.j2
+    # same code snippet in src/sonic-package-manager/templates/docker_image_ctl.j2
     case "$(cat /proc/cmdline)" in
     *SONIC_BOOT_TYPE=warm*)
         TYPE='warm'
@@ -159,7 +159,7 @@ stop() {
         debug "${TYPE} shutdown syncd process ..."
         /usr/bin/docker exec -i syncd$DEV /usr/bin/syncd_request_shutdown --${TYPE}
 
-        # wait until syncd quits gracefully or force syncd to exit after 
+        # wait until syncd quits gracefully or force syncd to exit after
         # waiting for 20 seconds
         start_in_secs=${SECONDS}
         end_in_secs=${SECONDS}
@@ -171,7 +171,7 @@ stop() {
         done
 
         if [[ $((end_in_secs - start_in_secs)) -gt $timer_threshold ]]; then
-            debug "syncd process in container syncd$DEV did not exit gracefully" 
+            debug "syncd process in container syncd$DEV did not exit gracefully"
         fi
 
         /usr/bin/docker exec -i syncd$DEV /bin/sync
