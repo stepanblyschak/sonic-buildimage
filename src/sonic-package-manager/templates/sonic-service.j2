@@ -10,6 +10,7 @@
 [Unit]
 Description={{ description }}
 {%- for service in requires %}
+{#- Some services in belofw Requires, Requisite, etc. might not be multi-asic services #}
 Requires={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
 {%- endfor %}
 {%- for service in requisite %}
@@ -28,9 +29,9 @@ StartLimitBurst=3
 [Service]
 User={{ user|default("root") }}
 Environment=sonic_asic_platform={{ sonic_asic_platform }}
-ExecStartPre={{path}}/{{name}}.sh start{% if multi_instance == 'true' %} %i{% endif %}
-ExecStart={{path}}/{{name}}.sh wait{% if multi_instance == 'true' %} %i{% endif %}
-ExecStop={{path}}/{{name}}.sh stop{% if multi_instance == 'true' %} %i{% endif %}
+ExecStartPre={{path}}/{{name}}.sh start{% if multi_instance %} %i{% endif %}
+ExecStart={{path}}/{{name}}.sh wait{% if multi_instance %} %i{% endif %}
+ExecStop={{path}}/{{name}}.sh stop{% if multi_instance %} %i{% endif %}
 Restart=always
 RestartSec=30
 {%- if name == "syncd" %}

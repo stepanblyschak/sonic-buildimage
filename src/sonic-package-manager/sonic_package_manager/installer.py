@@ -64,7 +64,6 @@ class PackageInstallation:
             # re-raise exception
             raise err
 
-
     def uninstall_package(self):
         ''' Uninstall SONiC package from the system '''
 
