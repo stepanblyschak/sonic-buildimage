@@ -6,6 +6,7 @@ import docker
 import click
 
 from sonic_package_manager.operation import Operation
+from sonic_package_manager.errors import PackageInstallationError
 from sonic_package_manager.logger import get_logger
 
 class ImagePull(Operation):
@@ -36,7 +37,7 @@ class ImagePull(Operation):
             image.tag(self._package.get_repository(), 'latest')
         except docker.errors.APIError as err:
             self.restore()
-            raise err
+            raise PackageInstallationError('Failed to download {}: {}'.format(self._package.get_repository(), err))
 
     def restore(self):
         ''' Restore the image pull operation. '''
