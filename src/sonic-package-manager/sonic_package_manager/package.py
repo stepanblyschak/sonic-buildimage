@@ -52,30 +52,14 @@ class Package:
     def is_installed(self):
         ''' Tell if a package is installed. '''
 
-        # TODO: change to read the database info about package
-        client = docker.from_env()
-        images = client.images.list()
-        repository = self.get_repository()
-        for image in images:
-            for tag in image.tags:
-                if tag.rsplit(':', 1)[0] == self.get_repository():
-                    return True
-        return False
+        return self._package_data.get('status', '') == 'installed'
 
     def installed_version(self):
         ''' Return an installed version as string.
         Returns None if the pacakge is not installed.
         '''
 
-        client = docker.from_env()
-        images = client.images.list()
-        repository = self.get_repository()
-        for image in images:
-            for tag in image.tags:
-                if tag.split(':')[-1] == 'latest':
-                    continue
-                return tag.split(':')[-1]
-        return None
+        return self._package_data.get('version', None)
 
     def status(self):
         ''' Tell the package status - Installed/Not Installed/Built-In. '''

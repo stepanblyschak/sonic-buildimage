@@ -116,6 +116,42 @@ class PackageDatabase:
         package_path = self.get_sonic_package_base_dir(name)
         return Package(name, package_info, package_path)
 
+    def update_package_status(self, name, status):
+        ''' Updates package instllation status.
+
+        Args:
+            name (str): SONiC package name
+            status (str): Installation status (installed, not-installed)
+        Returns:
+            None.
+        '''
+
+        if not self.has_package(name):
+            raise PackageNotFoundError(name)
+
+        pkg = self._package_database[name]
+        pkg['status'] = status
+
+        self._commit_db(self._package_database)
+
+    def update_package_version(self, name, version):
+        ''' Updates package instllation status.
+
+        Args:
+            name (str): SONiC package name
+            version (str): Version that is installed.
+        Returns:
+            None.
+        '''
+
+        if not self.has_package(name):
+            raise PackageNotFoundError(name)
+
+        pkg = self._package_database[name]
+        pkg['version'] = version
+
+        self._commit_db(self._package_database)
+
     def has_package(self, name):
         ''' Checks if the database contains an entry for a package
         called name. Returns True if the package exists, otherwise False.
