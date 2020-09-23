@@ -8,12 +8,9 @@ import natsort
 import yaml
 import docker
 
-import package as pkg
-import database
-import installer
-
+from sonic_package_manager.database import PackageDatabase
+from sonic_package_manager.installation import PackageInstallation
 from sonic_package_manager.errors import *
-from sonic_package_manager.installer import PackageInstallation
 
 
 @click.group()
@@ -25,7 +22,7 @@ def cli():
 def list():
     ''' List available packages. '''
 
-    db = database.PackageDatabase()
+    db = PackageDatabase()
     table_header = ["Name", "Repository", "Description", "Version", "Status"]
     table_body = []
 
@@ -46,7 +43,7 @@ def describe(name):
     ''' Print the manifest content. '''
 
     try:
-        db = database.PackageDatabase()
+        db = PackageDatabase()
         pkg = db.get_package(name)
         if not pkg.is_installed():
             raise PackageManagerError('{} is not installed'.format(name))
@@ -67,7 +64,7 @@ def add(name, repository, default_version):
         click.secho("Root privileges required for this operation", fg="red")
         sys.exit(1)
     try:
-        db = database.PackageDatabase()
+        db = PackageDatabase()
         db.add_package(name, repository, description=None, default_version=default_version)
     except PackageManagerError as err:
         click.secho("Failed to add package {}: {}".format(name, err), fg="red")
@@ -83,7 +80,7 @@ def remove(name):
         click.secho("Root privileges required for this operation", fg="red")
         sys.exit(1)
     try:
-        db = database.PackageDatabase()
+        db = PackageDatabase()
         db.remove_package(name)
     except PackageManagerError as err:
         click.secho("Failed to remove package {}: {}".format(name, err), fg="red")
