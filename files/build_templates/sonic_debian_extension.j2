@@ -202,7 +202,7 @@ sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/sonic-utilities-data_*.deb || \
 sudo cp -f $IMAGE_CONFIGS/bash/bash.bashrc $FILESYSTEM_ROOT/etc/
 
 # Install SONiC Package Manager (and its dependencies via 'apt-get -y install -f')
-sudo dpkg --root=$FILESYSTEM_ROOT -i $python_debs_path/sonic-package-manager_*.deb || \
+sudo dpkg --root=$FILESYSTEM_ROOT -i $python_debs_path/python-sonic-package-manager_*.deb || \
     sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
 
 {% if enable_ztp == "y" %}
