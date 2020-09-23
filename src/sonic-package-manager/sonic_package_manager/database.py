@@ -12,6 +12,30 @@ class PackageDatabase:
 
     SPM_PATH = '/var/lib/sonic-package-manager/'
 
+    @staticmethod
+    def get_library_dir():
+        ''' Return sonic-package-manager directory. '''
+
+        return PackageDatabase.SPM_PATH
+
+    @staticmethod
+    def get_sonic_packages_file():
+        ''' Return packages.yml path in SONiC OS. '''
+
+        return os.path.join(PackageDatabase.SPM_PATH, 'packages.yml')
+
+    @staticmethod
+    def get_sonic_package_base_dir(name):
+        ''' Return a base path for package called name. '''
+
+        return os.path.join(PackageDatabase.SPM_PATH, name)
+
+    @staticmethod
+    def get_package_metadata_folder(package):
+        ''' Return a base path for package. '''
+
+        return PackageDatabase.get_sonic_package_base_dir(package.get_name())
+
     def __init__(self):
         ''' Initialize PackageDatabase.
         Reads the content of packages.yml and loads the database.
@@ -19,33 +43,6 @@ class PackageDatabase:
 
         self._package_database = self._read_db()
 
-    def _read_db(self):
-        ''' Read the database file.
-
-        Returns:
-            (dict): Package database content.
-        '''
-
-        dbfile = self.get_sonic_packages_file()
-        try:
-            with open(dbfile) as database:
-                return yaml.safe_load(database)
-        except OSError as err:
-            raise PackageManagerError("Failed to read {}: {}".format(dbfile, err))
-
-    def _commit_db(self, content):
-        ''' Save the database to persistent file.
-
-        Args:
-            content (dict): Database content.
-        '''
-
-        dbfile = self.get_sonic_packages_file()
-        try:
-            with open(dbfile, 'w') as database:
-                return yaml.safe_dump(content, database)
-        except OSError as err:
-            raise PackageManagerError("Failed to write to {}: {}".format(dbfile, err))
 
     def add_package(self, name, repository, description=None, default_version=None):
         ''' Add a new package entry in database.
@@ -87,17 +84,6 @@ class PackageDatabase:
 
         self._commit_db(self._package_database)
 
-    def __iter__(self):
-        ''' Iterates over packages in the database.
-
-        Yields:
-            package (Package): SONiC Package object
-
-        '''
-
-        for name, _ in self._package_database.items():
-            yield self.get_package(name)
-
     def get_package(self, name):
         ''' Return a packages called name.
         If the packages wan't found  PackageNotFoundError is thrown.
@@ -115,6 +101,22 @@ class PackageDatabase:
 
         package_path = self.get_sonic_package_base_dir(name)
         return Package(name, package_info, package_path)
+
+    def has_package(self, name):
+        ''' Checks if the database contains an entry for a package
+        called name. Returns True if the package exists, otherwise False.
+
+        Args:
+            name (str): SONiC package name
+        Returns:
+            (bool): True of the package exists, otherwise False.
+        '''
+
+        try:
+            self.get_package(name)
+            return True
+        except PackageNotFoundError:
+            return False
 
     def update_package_status(self, name, status):
         ''' Updates package instllation status.
@@ -152,43 +154,42 @@ class PackageDatabase:
 
         self._commit_db(self._package_database)
 
-    def has_package(self, name):
-        ''' Checks if the database contains an entry for a package
-        called name. Returns True if the package exists, otherwise False.
+    def _read_db(self):
+        ''' Read the database file.
 
-        Args:
-            name (str): SONiC package name
         Returns:
-            (bool): True of the package exists, otherwise False.
+            (dict): Package database content.
         '''
 
+        dbfile = self.get_sonic_packages_file()
         try:
-            self.get_package(name)
-            return True
-        except PackageNotFoundError:
-            return False
+            with open(dbfile) as database:
+                return yaml.safe_load(database)
+        except OSError as err:
+            raise PackageManagerError("Failed to read {}: {}".format(dbfile, err))
 
-    @staticmethod
-    def get_library_dir():
-        ''' Return sonic-package-manager directory. '''
+    def _commit_db(self, content):
+        ''' Save the database to persistent file.
 
-        return PackageDatabase.SPM_PATH
+        Args:
+            content (dict): Database content.
+        '''
 
-    @staticmethod
-    def get_sonic_packages_file():
-        ''' Return packages.yml path in SONiC OS. '''
+        dbfile = self.get_sonic_packages_file()
+        try:
+            with open(dbfile, 'w') as database:
+                return yaml.safe_dump(content, database)
+        except OSError as err:
+            raise PackageManagerError("Failed to write to {}: {}".format(dbfile, err))
 
-        return os.path.join(PackageDatabase.SPM_PATH, 'packages.yml')
+    def __iter__(self):
+        ''' Iterates over packages in the database.
 
-    @staticmethod
-    def get_sonic_package_base_dir(name):
-        ''' Return a base path for package called name. '''
+        Yields:
+            package (Package): SONiC Package object
 
-        return os.path.join(PackageDatabase.SPM_PATH, name)
+        '''
 
-    @staticmethod
-    def get_package_metadata_folder(package):
-        ''' Return a base path for package. '''
-
-        return PackageDatabase.get_sonic_package_base_dir(package.get_name())
+        for name, _ in self._package_database.items():
+            yield self.get_package(name)
 
