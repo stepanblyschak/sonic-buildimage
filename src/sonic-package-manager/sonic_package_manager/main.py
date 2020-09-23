@@ -31,8 +31,8 @@ def list():
             package.get_name(),
             package.get_repository(),
             package.get_description(),
-            package.installed_version() or "N/A",
-            package.status()
+            package.get_installed_version() or "N/A",
+            package.get_status()
         ])
     print(tabulate.tabulate(table_body, table_header))
 
