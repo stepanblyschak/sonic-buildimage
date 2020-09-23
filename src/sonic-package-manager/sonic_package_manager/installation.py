@@ -37,6 +37,8 @@ class PackageInstallation:
         ]
 
         self._package = package
+        self._version = version
+        self._database = database
 
     def install_package(self):
         ''' Install SONiC package and integrate in system. '''
@@ -53,6 +55,8 @@ class PackageInstallation:
                 operation = self._operations.pop(0)
                 operation.execute()
                 done_operations.append(operation)
+            self._database.update_package_status(self._package.get_name(), 'installed')
+            self._database.update_package_version(self._package.get_name(), self._version)
         except PackageInstallationError as err:
             # restore
             while done_operations:
@@ -81,4 +85,7 @@ class PackageInstallation:
         while self._operations:
             operation = self._operations.pop(0)
             operation.restore()
+
+        self._database.update_package_status(self._package.get_name(), 'not-installed')
+        self._database.update_package_version(self._package.get_name(), None)
 
