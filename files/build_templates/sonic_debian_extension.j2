@@ -191,7 +191,7 @@ sudo dpkg --root=$FILESYSTEM_ROOT -i $python_debs_path/python-sonic-utilities_*.
     sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
 
 # Install SONiC Package Manager (and its dependencies via 'apt-get -y install -f')
-sudo dpkg --root=$FILESYSTEM_ROOT -i $python_debs_path/sonic-package-manager_*.deb || \
+sudo dpkg --root=$FILESYSTEM_ROOT -i $python_debs_path/python-sonic-package-manager_*.deb || \
     sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
 
 {% if enable_ztp == "y" %}
