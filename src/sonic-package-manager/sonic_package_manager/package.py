@@ -6,6 +6,9 @@ import yaml
 import docker
 
 
+from sonic_package_manager.errors import PackageManagerError
+
+
 class Package:
     ''' SONiC package interface '''
 
@@ -25,43 +28,33 @@ class Package:
         self._metadata_path = metadata_path
 
     def get_name(self):
-        ''' Package name. '''
+        ''' Returns Package name. '''
 
         return self._name
 
     def get_repository(self):
-        ''' Package repository. '''
+        ''' Returns Package repository. '''
 
         return self._package_data["repository"]
 
     def get_default_version(self):
-        ''' Package default version. '''
+        ''' Returns Package default version. '''
 
         return self._package_data.get("default-version", None)
 
     def get_description(self):
-        ''' Package description. '''
+        ''' Returns Package description. '''
 
         return self._package_data.get("description", "N/A")
 
-    def is_builtin(self):
-        ''' Tell if a package is an essential package. '''
-
-        return self._package_data.get("essential", False)
-
-    def is_installed(self):
-        ''' Tell if a package is installed. '''
-
-        return self._package_data.get('status', '') == 'installed'
-
-    def installed_version(self):
-        ''' Return an installed version as string.
+    def get_installed_version(self):
+        ''' Returns an installed version as string.
         Returns None if the pacakge is not installed.
         '''
 
         return self._package_data.get('version', None)
 
-    def status(self):
+    def get_status(self):
         ''' Tell the package status - Installed/Not Installed/Built-In. '''
 
         if self.is_builtin():
@@ -89,3 +82,16 @@ class Package:
                         return yaml.safe_load(stream)
             except IOError:
                 continue
+
+        raise PackageManagerError("Failed to locate manifest file")
+
+    def is_builtin(self):
+        ''' Tell if a package is an essential package. '''
+
+        return self._package_data.get("essential", False)
+
+    def is_installed(self):
+        ''' Tell if a package is installed. '''
+
+        return self._package_data.get('status', '') == 'installed'
+
