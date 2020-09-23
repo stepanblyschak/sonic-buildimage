@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+import os
 import click
 import tabulate
 import natsort
