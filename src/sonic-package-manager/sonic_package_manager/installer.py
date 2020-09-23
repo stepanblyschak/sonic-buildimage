@@ -7,7 +7,7 @@ import docker
 import swsssdk
 
 from sonic_package_manager.imagepull import ImagePull
-from sonic_package_manager.metadatainstall import MetadataInstall
+from sonic_package_manager.metadata import MetadataInstall
 from sonic_package_manager.feature import FeatureTableUpdater
 from sonic_package_manager.systemd import SystemdGenerator
 

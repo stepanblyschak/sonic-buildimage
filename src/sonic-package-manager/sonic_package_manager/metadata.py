@@ -66,10 +66,11 @@ class MetadataInstall(Operation):
     def restore(self):
         ''' Execute restore operation for this operation. '''
 
+        metadatafolder = PackageDatabase.get_package_metadata_folder(self._package)
         try:
-            shutil.rmtree(PackageDatabase.get_package_metadata_folder(self._package))
+            if os.path.exists(metadatafolder):
+                shutil.rmtree(metadatafolder)
         except OSError as err:
-            raise PackageInstallationError('Failed to remove package metadat: {}'.format(err))
-
+            raise PackageInstallationError('Failed to remove package metadata: {}'.format(err))
         get_logger().info('Removed package metadata...')
 
