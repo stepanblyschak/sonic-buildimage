@@ -13,22 +13,87 @@ class PackageDatabase:
     SPM_PATH = '/var/lib/sonic-package-manager/'
 
     def __init__(self):
-        ''' Initialize PackageDatabase. Reads the content of packages.yml and loads
-        the database.
+        ''' Initialize PackageDatabase.
+        Reads the content of packages.yml and loads the database.
         '''
 
-        self._package_database = {}
+        self._package_database = self._read_db()
 
+    def _read_db(self):
+        ''' Read the database file.
+
+        Returns:
+            (dict): Package database content.
+        '''
+
+        dbfile = self.get_sonic_packages_file()
         try:
-            with open(self.get_sonic_packages_file()) as database:
-                self._package_database = yaml.safe_load(database)
+            with open(dbfile) as database:
+                return yaml.safe_load(database)
         except OSError as err:
-            raise PackageManagerError(
-                    "Failed to read {}: {}".format(self.get_sonic_packages_file(), err)
-                  )
+            raise PackageManagerError("Failed to read {}: {}".format(dbfile, err))
+
+    def _commit_db(self, content):
+        ''' Save the database to persistent file.
+
+        Args:
+            content (dict): Database content.
+        '''
+
+        dbfile = self.get_sonic_packages_file()
+        try:
+            with open(dbfile, 'w') as database:
+                return yaml.safe_dump(content, database)
+        except OSError as err:
+            raise PackageManagerError("Failed to write to {}: {}".format(dbfile, err))
+
+    def add_package(self, name, repository, description=None, default_version=None):
+        ''' Add a new package entry in database.
+
+        Args:
+            name (str): package name.
+            repository (str): package repository.
+            description (str): description field.
+            default_version (str): default installation version.
+        '''
+
+        if self.has_package(name):
+            raise PackageManagerError("Package {} already exists in database".format(name))
+
+        self._package_database[name] = {
+            'repository': repository,
+            'description': description,
+            'default-version': default_version,
+        }
+
+        self._commit_db(self._package_database)
+
+    def remove_package(self, name):
+        ''' Remove a package entry from database.
+
+        Args:
+            name (str): package name.
+        '''
+
+        if not self.has_package(name):
+            raise PackageManagerError("Package {} does not exist in database".format(name))
+
+        package = self.get_package(name)
+
+        if package.is_installed():
+            raise PackageManagerError("Package {} is installed, uninstall the package first".format(name))
+
+        self._package_database.pop(name)
+
+        self._commit_db(self._package_database)
 
     def __iter__(self):
-        ''' Iterates over packages in the database. '''
+        ''' Iterates over packages in the database.
+
+        Yields:
+            package (Package): SONiC Package object
+
+        '''
 
         for name, _ in self._package_database.items():
             yield self.get_package(name)
@@ -36,6 +101,11 @@ class PackageDatabase:
     def get_package(self, name):
         ''' Return a packages called name.
         If the packages wan't found  PackageNotFoundError is thrown.
+
+        Args:
+            name (str): SONiC package name
+        Returns:
+            (Package): SONiC Package object
         '''
 
         try:
@@ -44,12 +114,16 @@ class PackageDatabase:
             raise PackageNotFoundError(name)
 
         package_path = self.get_sonic_package_base_dir(name)
-
         return Package(name, package_info, package_path)
 
     def has_package(self, name):
         ''' Checks if the database contains an entry for a package
         called name. Returns True if the package exists, otherwise False.
+
+        Args:
+            name (str): SONiC package name
+        Returns:
+            (bool): True of the package exists, otherwise False.
         '''
 
         try:
