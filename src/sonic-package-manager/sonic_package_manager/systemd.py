@@ -3,279 +3,250 @@
 ''' This module implements an Operation that integrates the package with systemd. '''
 
 import os
-import stat
 import subprocess
-import jinja2
 from sonic_py_common.device_info import get_sonic_version_info
 
-from sonic_package_manager.operation import Operation
 from sonic_package_manager.logger import get_logger
 from sonic_package_manager.errors import PackageInstallationError
 
+from sonic_package_manager.common import (
+    render_template,
+    get_template,
+    set_executable_bit,
+    run_command,
+)
 
-class TemplateGenerator:
-    ''' Base class with helper utilities to render j2 templates. '''
+SERVICE_FILE_TEMPLATE        = 'sonic-service.j2'
+SERVICE_FILE_LOCATION        = os.path.join('/', 'usr', 'lib', 'systemd', 'system')
+SERVICE_MGMT_SCRIPT_TEMPLATE = 'service-mgmt.sh.j2'
+SERVICE_MGMT_SCRIPT_LOCATION = os.path.join('/', 'usr', 'local', 'bin')
+DOCKER_CTL_SCRIPT_TEMPLATE   = 'docker_image_ctl.j2'
+DOCKER_CTL_SCRIPT_LOCALTION  = os.path.join('/', 'usr', 'bin')
 
-    @staticmethod
-    def render_template(intemplate, outfile, renderctx):
-        ''' Template renderer helper routine.
-
-        Args:
-            instemplate (str): Input file with template content.
-            outfile (str): Output file to render template to.
-            renderctx (dict): Dictionary used to generate jinja2 template
-        '''
-
-        with open(intemplate, 'r') as instream:
-            template = jinja2.Template(instream.read())
-
-        with open(outfile, 'w') as outstream:
-            outstream.write(template.render(**renderctx))
+ETC_SONIC_PATH = os.path.join('/', 'etc', 'sonic')
 
 
-class SystemdGenerator(TemplateGenerator, Operation):
-    ''' Generate all needed files for integration with systemd '''
-
-    SERVICE_FILE_TEMPLATE        = '/usr/share/sonic/templates/sonic-service.j2'
-    SERVICE_FILE_LOCATION        = '/usr/lib/systemd/system/'
-    SERVICE_MGMT_SCRIPT_TEMPLATE = '/usr/share/sonic/templates/service-mgmt.sh.j2'
-    SERVICE_MGMT_SCRIPT_LOCATION = '/usr/local/bin/'
-    DOCKER_CTL_SCRIPT_TEMPLATE   = '/usr/share/sonic/templates/docker_image_ctl.j2'
-    DOCKER_CTL_SCRIPT_LOCALTION  = '/usr/bin/'
-
-    @staticmethod
-    def get_service_file_path(package):
-        return os.path.join(SystemdGenerator.SERVICE_FILE_LOCATION,
-            '{}.service'.format(package.get_name()))
-
-    @staticmethod
-    def get_service_file_parametrized_path(package):
-        return os.path.join(SystemdGenerator.SERVICE_FILE_LOCATION,
-            '{}@.service'.format(package.get_name()))
-
-    @staticmethod
-    def get_service_mgmt_script_path(package):
-        return os.path.join(SystemdGenerator.SERVICE_MGMT_SCRIPT_LOCATION,
-            '{}.sh'.format(package.get_name()))
-
-    @staticmethod
-    def get_docker_ctl_script_path(package):
-        return os.path.join(SystemdGenerator.DOCKER_CTL_SCRIPT_LOCALTION,
-            '{}.sh'.format(package.get_name()))
-
-    @staticmethod
-    def reload_systemd():
-        ''' Executes systemctl 'daemon-reload' '''
-
-        proc = subprocess.Popen("systemctl daemon-reload", shell=True, stdout=subprocess.PIPE)
-        (out, _) = proc.communicate()
-        if proc.returncode != 0:
-            raise PackageInstallationError("Failed to execute 'systemctl daemon-reload'")
-
-    def __init__(self, database, package):
-        ''' Initialize SystemdGenerator.
-
-        Args:
-            database (PackageDatabase): SONiC PackageDatabase instance.
-            package (Package): SONiC Package instance to install.
-        '''
-
-        self._database = database
-        self._package = package
-
-    def _generate_systemd_service(self, package):
-        ''' Generate systemd configuration for SONiC package
-        TODO: service name
-        TODO: timer for delayed services
-        TODO: user for services
-        '''
-
-        manifest            = package.get_manifest()
-        service_props       = manifest.get('service', dict())
-        sonic_asic_platform = get_sonic_version_info()['asic_type']
-        is_asic_service     = service_props.get('asic-service', False)
-
-        description = package.get_description()
-        name = package.get_name()
-        requires = []
-        requisite = []
-        after = []
-        before = []
-
-        unit_attributes = dict(
-            requires=requires,
-            requisite=requisite,
-            after=after,
-            before=before
-        )
-
-        for unit_attribute, services in unit_attributes.iteritems():
-            for unit in service_props.get(unit_attribute, []):
-                unitinfo = dict(
-                    name=unit,
-                    is_package=self._database.has_package(unit)
-                )
-                services.append(service_info)
+def get_service_file_path(package):
+    name = package.get_feature_name()
+    return os.path.join(SERVICE_FILE_LOCATION, '{}.service'.format(name))
 
 
-        outputfile = SystemdGenerator.get_service_file_path(package)
-        SystemdGenerator.render_template(self.SERVICE_FILE_TEMPLATE,
-            outputfile,
-            {
-                'description'        : description,
-                'name'               : name,
-                'requires'           : requires,
-                'requisite'          : requisite,
-                'after'              : after,
-                'before'             : before,
-                'sonic_asic_platform': sonic_asic_platform,
-                'multi_instance'     : False,
-            }
-        )
+def get_service_file_parametrized_path(package):
+    name = package.get_feature_name()
+    return os.path.join(SERVICE_FILE_LOCATION, '{}@.service'.format(name))
+
+
+def get_service_mgmt_script_path(package):
+    name = package.get_feature_name()
+    return os.path.join(SERVICE_MGMT_SCRIPT_LOCATION, '{}.sh'.format(name))
+
+
+def get_docker_ctl_script_path(package):
+    name = package.get_feature_name()
+    return os.path.join(DOCKER_CTL_SCRIPT_LOCALTION, '{}.sh'.format(name))
+
+
+def install_service(database, repository):
+    ''' Generate required files/scripts to integrate
+    a package with SONiC service management system '''
+
+    package = repository.get_package()
+    _generate_systemd_service(database, repository)
+    if package.get_feature_name() != 'database':
+        _generate_service_mgmt_script(database, repository)
+    _update_dependent_list(repository)
+    _generate_docker_ctl_script(repository)
+
+    _reload_systemd()
+
+
+def uninstall_service(repository):
+    ''' Cleanup all generated files/scripts by generate() '''
+
+    package = repository.get_package()
+
+    _cleanup_generated(get_service_file_path(package))
+    _cleanup_generated(get_service_mgmt_script_path(package))
+    _cleanup_generated(get_docker_ctl_script_path(package))
+
+    _update_dependent_list(repository, True)
+
+    _reload_systemd()
+
+
+def _reload_systemd():
+    ''' Executes systemctl 'daemon-reload' '''
+
+    run_command('systemctl daemon-reload')
+
+
+def _generate_systemd_service(database, repository):
+    ''' Generate systemd configuration for SONiC package
+
+    TODO: Timer generation for delayed services.
+
+    Args:
+        database (RepositoryDatabase): RepositoryDatabase object.
+        repository (Repository): Repository to install.
+    '''
+
+    package             = repository.get_package()
+    manifest            = package.get_manifest()
+    service_props       = manifest.get('service', dict())
+    sonic_asic_platform = get_sonic_version_info()['asic_type']
+    is_asic_service     = service_props.get('asic-service', False)
+    service_user        = service_props.get('user', 'root')
+
+    package = repository.get_package()
+    description = repository.get_description()
+    name = package.get_feature_name()
+    requires = []
+    requisite = []
+    after = []
+    before = []
+
+    unit_attributes = dict(
+        requires=requires,
+        requisite=requisite,
+        after=after,
+        before=before
+    )
+
+    for unit_attribute, services in unit_attributes.iteritems():
+        for unit in service_props.get(unit_attribute, []):
+            unitinfo = dict(
+                name=unit,
+                is_package=database.is_package_installed(unit),
+            )
+            services.append(unitinfo)
+
+    template_vars = {
+        'description'        : description,
+        'name'               : name,
+        'requires'           : requires,
+        'requisite'          : requisite,
+        'after'              : after,
+        'before'             : before,
+        'sonic_asic_platform': sonic_asic_platform,
+        'user'               : service_user,
+        'multi_instance'     : False,
+    }
+
+    outputfile = get_service_file_path(package)
+    render_template(get_template(SERVICE_FILE_TEMPLATE), outputfile, template_vars)
+    get_logger().info('Installed {}'.format(outputfile))
+
+    if is_asic_service:
+        outputfile = get_service_file_parametrized_path(package)
+        template_vars['multi_instance'] = True
+        render_template(get_template(SERVICE_FILE_TEMPLATE), outputfile, template_vars)
         get_logger().info('Installed {}'.format(outputfile))
 
-        if is_asic_service:
-            outputfile = SystemdGenerator.get_service_file_parametrized_path(package)
-            SystemdGenerator.render_template(self.SERVICE_FILE_TEMPLATE,
-                outputfile,
-                {
-                    'description'        : description,
-                    'name'               : name,
-                    'requires'           : requires,
-                    'requisite'          : requisite,
-                    'after'              : after,
-                    'before'             : before,
-                    'sonic_asic_platform': sonic_asic_platform,
-                    'multi_instance'     : False,
-                }
-            )
-            get_logger().info('Installed {}'.format(outputfile))
 
-    def _generate_service_mgmt_script(self, package):
-        ''' Generate service management script under /usr/local/bin/<package-name>.sh '''
+def _generate_service_mgmt_script(database, repository):
+    ''' Generate service management script under /usr/local/bin/<package-name>.sh '''
 
-        dependent_services = []
-        multiasic_dependent_services = []
-        peer_service_name = package.get_manifest()['service'].get('peer', '')
-        service_name = package.get_name()
-        sonic_asic_platform = get_sonic_version_info()['asic_type']
+    package = repository.get_package()
+    dependent_services = []
+    multiasic_dependent_services = []
+    peer_service_name = package.get_manifest()['service'].get('peer', '')
+    service_name = package.get_feature_name()
+    sonic_asic_platform = get_sonic_version_info()['asic_type']
 
-        # Find reverse dependencies: pkgiter depends on package
-        for pkgiter in self._database:
-            if pkgiter.get_name() == service_name:
-                continue
-            if not pkgiter.is_installed():
-                continue
-            manifest = pkgiter.get_manifest()
-            dependent_of = manifest.get('service', dict()).get('dependent-of')
-            if not dependent_of:
-                continue
-            is_multiasic_service = manifest.get('service', dict()).get('asic-service', False)
-            for service in dependent_of:
-                if service == service_name:
-                    if is_multiasic_service:
-                        multiasic_dependent_services.append(pkgiter.get_name())
-                    else:
-                        dependent_services.append(pkgiter.get_name())
+    render_template(get_template(SERVICE_MGMT_SCRIPT_TEMPLATE),
+        get_service_mgmt_script_path(package),
+        {
+            'dependent_services'          : dependent_services,
+            'multiasic_dependent_services': multiasic_dependent_services,
+            'peer_service_name'           : peer_service_name,
+            'service_name'                : service_name,
+            'sonic_asic_platform'         : sonic_asic_platform,
+        }
+    )
 
-        SystemdGenerator.render_template(self.SERVICE_MGMT_SCRIPT_TEMPLATE,
-            SystemdGenerator.get_service_mgmt_script_path(package),
-            {
-                'dependent_services'          : dependent_services,
-                'multiasic_dependent_services': multiasic_dependent_services,
-                'peer_service_name'           : peer_service_name,
-                'service_name'                : service_name,
-                'sonic_asic_platform'         : sonic_asic_platform,
-            }
-        )
+    set_executable_bit(get_service_mgmt_script_path(package))
 
-        # Make it executable
-        st = os.stat(SystemdGenerator.get_service_mgmt_script_path(package))
-        os.chmod(SystemdGenerator.get_service_mgmt_script_path(package), st.st_mode | stat.S_IEXEC)
+    get_logger().info('Installed {}'.format(get_service_mgmt_script_path(package)))
 
-        get_logger().info('Installed {}'.format(SystemdGenerator.get_service_mgmt_script_path(package)))
 
-    def _generate_service_mgmt_scripts(self, package):
-        ''' Regenerate service management scripts '''
+def _update_dependent_list(repository, remove=False):
+    ''' Generate dependent file list. '''
 
-        # TODO: Here we need to regenerate all service management scripts
-        # to hook up new dependent services in existing services.
-        # It will require every and also essentail SONiC packages to support
-        # service script autogeneration. Current it is done only for the package
-        # been installed and for swss service.
-        # for package in self._database:
-        #    self._generate_service_mgmt_script(package)
+    package = repository.get_package()
+    service_name = package.get_feature_name()
+    manifest = package.get_manifest()
+    service_props = manifest.get('service', dict())
+    dependent_of = service_props.get('dependent-of', [])
+    is_multiasic_service = service_props.get('asic-service', False)
 
-        self._generate_service_mgmt_script(package)
-        # skip swss service as well for now
-        # self._generate_service_mgmt_script(self._database.get_package('swss'))
+    files = ['{}_dependent']
+    if is_multiasic_service:
+        files.append('{}_multi_inst_dependent')
 
-    def _generate_docker_ctl_script(self, package):
-        ''' Generate docker control script '''
+    for service in dependent_of:
+        if service != 'swss':
+            raise PackageInstallationError(
+                'Current only "swss" service can be in "dependent-of" list')
 
-        name = package.get_name()
-        repository = package.get_repository()
-        manifest = package.get_manifest()
-        container_props = manifest['container']
-        run_opt = []
-        sonic_asic_platform = get_sonic_version_info()['asic_type']
+        for filepattern in files:
+            with open(os.path.join(ETC_SONIC_PATH, filepattern.format(service)), 'a+') as f:
+                f.seek(0)
+                dependent = f.read().strip().split()
+                if remove:
+                    try:
+                        dependent.remove(service_name)
+                    except ValueError:
+                        pass
+                else:
+                    dependent.append(service_name)
+                f.seek(0)
+                f.truncate()
+                f.write(' '.join(dependent))
 
-        if container_props.get('privileged', False):
-            run_opt.append('--privileged')
 
-        run_opt.append('-t')
+def _generate_docker_ctl_script(repository):
+    ''' Generate docker control script '''
 
-        for mount in container_props.get('mounts', []):
-            run_opt.append('-v {}'.format(mount))
+    package = repository.get_package()
+    name = package.get_feature_name()
+    repository = repository.get_repository()
+    manifest = package.get_manifest()
+    container_props = manifest['container']
+    run_opt = []
+    sonic_asic_platform = get_sonic_version_info()['asic_type']
 
-        SystemdGenerator.render_template(self.DOCKER_CTL_SCRIPT_TEMPLATE,
-            SystemdGenerator.get_docker_ctl_script_path(package),
-            {
-                'docker_container_name': name,
-                'docker_image_name'    : repository,
-                'docker_image_run_opt' : ' '.join(run_opt),
-                'sonic_asic_platform'  : sonic_asic_platform,
-            }
-        )
+    if container_props.get('privileged', False):
+        run_opt.append('--privileged')
 
-        # Make it executable
-        st = os.stat(SystemdGenerator.get_docker_ctl_script_path(package))
-        os.chmod(SystemdGenerator.get_docker_ctl_script_path(package), st.st_mode | stat.S_IEXEC)
+    run_opt.append('-t')
 
-        get_logger().info('Installed {}'.format(SystemdGenerator.get_docker_ctl_script_path(package)))
+    for volume in container_props.get('volumes', []):
+        run_opt.append('-v {}'.format(volume))
 
-    def generate(self, package):
-        ''' Generate required files/scripts to integrate
-        a package with SONiC service management system '''
+    for mount in container_props.get('mounts', []):
+        run_opt.append('--mount type={type},source={source},target={target}'.format(**mount))
 
-        self._generate_systemd_service(package)
-        if package.get_name() != 'database':
-            self._generate_service_mgmt_scripts(package)
-        self._generate_docker_ctl_script(package)
+    for envname, value in container_props.get('environment', dict()).iteritems():
+        run_opt.append('-e {}={}'.format(envname, value))
+    
+    run_opt = ' '.join(run_opt)
 
-        self.reload_systemd()
+    render_template(get_template(DOCKER_CTL_SCRIPT_TEMPLATE),
+        get_docker_ctl_script_path(package),
+        {
+            'docker_container_name': name,
+            'docker_image_name'    : repository,
+            'docker_image_run_opt' : run_opt,
+            'sonic_asic_platform'  : sonic_asic_platform,
+        }
+    )
 
-    def _cleanup_generated(self, path):
-        if os.path.exists(path):
-            get_logger().info('Removing {}'.format(path))
-            os.remove(path)
+    set_executable_bit(get_docker_ctl_script_path(package))
 
-    def cleanup_generated_files(self, package):
-        ''' Cleanup all generated files/scripts by generate() '''
+    get_logger().info('Installed {}'.format(get_docker_ctl_script_path(package)))
 
-        self._cleanup_generated(SystemdGenerator.get_service_file_path(package))
-        self._cleanup_generated(SystemdGenerator.get_service_mgmt_script_path(package))
-        self._cleanup_generated(SystemdGenerator.get_docker_ctl_script_path(package))
 
-        self.reload_systemd()
-
-    def execute(self):
-        try:
-            self.generate(self._package)
-        except PackageInstallationError as err:
-            self.cleanup_generated_files(self._package)
-            raise
-
-    def restore(self):
-        self.cleanup_generated_files(self._package)
-
+def _cleanup_generated(path):
+    if os.path.exists(path):
+        get_logger().info('Removing {}'.format(path))
+        os.remove(path)

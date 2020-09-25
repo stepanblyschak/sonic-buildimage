@@ -1,195 +1,181 @@
 #!/usr/bin/env python
 
 import os
+import json
 import yaml
 
-from sonic_package_manager.package import Package
-from sonic_package_manager.errors import PackageManagerError, PackageNotFoundError
+from sonic_package_manager import common
+from sonic_package_manager.repository import Repository
+from sonic_package_manager.errors import PackageManagerError, RepositoryNotFoundError
 
 
-class PackageDatabase:
-    ''' An interface to SONiC packages database '''
-
-    SPM_PATH = '/var/lib/sonic-package-manager/'
-
-    @staticmethod
-    def get_library_dir():
-        ''' Return sonic-package-manager directory. '''
-
-        return PackageDatabase.SPM_PATH
-
-    @staticmethod
-    def get_sonic_packages_file():
-        ''' Return packages.yml path in SONiC OS. '''
-
-        return os.path.join(PackageDatabase.SPM_PATH, 'packages.yml')
-
-    @staticmethod
-    def get_sonic_package_base_dir(name):
-        ''' Return a base path for package called name. '''
-
-        return os.path.join(PackageDatabase.SPM_PATH, name)
-
-    @staticmethod
-    def get_package_metadata_folder(package):
-        ''' Return a base path for package. '''
-
-        return PackageDatabase.get_sonic_package_base_dir(package.get_name())
+class RepositoryDatabase:
+    ''' An interface to SONiC repository database '''
 
     def __init__(self):
         ''' Initialize PackageDatabase.
         Reads the content of packages.yml and loads the database.
         '''
 
-        self._package_database = self._read_db()
+        self._repository_database = {}
+        self._read_db()
 
 
-    def add_package(self, name, repository, description=None, default_version=None):
-        ''' Add a new package entry in database.
+    def add_repository(self, name, repository, description='', default_version=None):
+        ''' Adds a new repository entry in database.
 
         Args:
-            name (str): package name.
-            repository (str): package repository.
-            description (str): description field.
-            default_version (str): default installation version.
+            repo (Repository): Repository entry.
+        Raises:
+            PackageManagerError: Raises when repository with the same name already exists
+                                 in the database.
         '''
 
-        if self.has_package(name):
-            raise PackageManagerError("Package {} already exists in database".format(name))
+        if self.has_repository(name):
+            raise PackageManagerError('Repository {} already exists in database'.format(name))
 
-        self._package_database[name] = {
-            'repository': repository,
-            'description': description,
-            'default-version': default_version,
-        }
+        self._repository_database[name] = Repository(name,
+            {
+                'repository': repository,
+                'description': description,
+                'default-version': default_version,
+            }
+        )
 
-        self._commit_db(self._package_database)
+        self._commit_db()
 
-    def remove_package(self, name):
-        ''' Remove a package entry from database.
+    def remove_repository(self, name):
+        ''' Removes repository entry from database.
 
         Args:
-            name (str): package name.
+            name (str): repository name.
+        Raises:
+            PackageManagerError: Raises when repository with the given name does not exist
+                                 in the database.
         '''
 
-        if not self.has_package(name):
-            raise PackageManagerError("Package {} does not exist in database".format(name))
+        if not self.has_repository(name):
+            raise PackageManagerError('Repository {} does not exist in database'.format(name))
 
-        package = self.get_package(name)
+        repo = self.get_repository(name)
 
-        if package.is_installed():
-            raise PackageManagerError("Package {} is installed, uninstall the package first".format(name))
+        if repo.is_installed():
+            raise PackageManagerError('Repository {} is installed, uninstall it first'.format(name))
 
-        self._package_database.pop(name)
+        self._repository_database.pop(name)
 
-        self._commit_db(self._package_database)
+        self._commit_db()
 
-    def get_package(self, name):
-        ''' Return a packages called name.
-        If the packages wan't found  PackageNotFoundError is thrown.
+    def update_repository(self, repo):
+        ''' Modify repository in the database.
 
         Args:
-            name (str): SONiC package name
+            repo (Repository): Repository object.
+        Raises:
+            PackageManagerError: Raises when repository with the given name does not exist
+                                 in the database.
+        '''
+
+        name = repo.get_name()
+
+        if not self.has_repository(name):
+            raise PackageManagerError("Repository {} does not exist in database".format(name))
+
+        self._repository_database[name] = repo
+
+        self._commit_db()
+
+    def get_repository(self, name):
+        ''' Return a repository called name.
+        If the repository wan't found RepositoryNotFoundError is thrown.
+
+        Args:
+            name (str): Repository name.
         Returns:
-            (Package): SONiC Package object
+            Reposotry: Repository object.
+        Raises:
+            RepositoryNotFoundError: When repository called name was not found.
         '''
 
         try:
-            package_info = self._package_database[name]
+            repo = self._repository_database[name]
         except KeyError:
-            raise PackageNotFoundError(name)
+            raise RepositoryNotFoundError(name)
 
-        package_path = self.get_sonic_package_base_dir(name)
-        return Package(name, package_info, package_path)
+        return repo
 
-    def has_package(self, name):
-        ''' Checks if the database contains an entry for a package
-        called name. Returns True if the package exists, otherwise False.
+    def has_repository(self, name):
+        ''' Checks if the database contains an entry for a repository.
+        called name. Returns True if the repositor exists, otherwise False.
 
         Args:
-            name (str): SONiC package name
+            name (str): Repository name
         Returns:
-            (bool): True of the package exists, otherwise False.
+            (bool): True of the repsotory exists, otherwise False.
         '''
 
         try:
-            self.get_package(name)
+            self.get_repository(name)
             return True
-        except PackageNotFoundError:
+        except RepositoryNotFoundError:
             return False
-
-    def update_package_status(self, name, status):
-        ''' Updates package instllation status.
-
-        Args:
-            name (str): SONiC package name
-            status (str): Installation status (installed, not-installed)
-        Returns:
-            None.
-        '''
-
-        if not self.has_package(name):
-            raise PackageNotFoundError(name)
-
-        pkg = self._package_database[name]
-        pkg['status'] = status
-
-        self._commit_db(self._package_database)
-
-    def update_package_version(self, name, version):
-        ''' Updates package instllation status.
+    
+    def is_package_installed(self, featurename):
+        ''' Checks if the database contains an entry for a repository called name
+        and it is installed. Returns True if the package, otherwise False.
 
         Args:
-            name (str): SONiC package name
-            version (str): Version that is installed.
+            featurename (str): Feature name
         Returns:
-            None.
+            (bool): True of the package is installed, otherwise False.
         '''
 
-        if not self.has_package(name):
-            raise PackageNotFoundError(name)
-
-        pkg = self._package_database[name]
-        pkg['version'] = version
-
-        self._commit_db(self._package_database)
+        for repo in self:
+            if not repo.is_installed():
+                continue
+            package = repo.get_package()
+            if package.get_feature_name() == featurename:
+                return True
+        
+        return False
 
     def _read_db(self):
-        ''' Read the database file.
+        ''' Read the database file. '''
 
-        Returns:
-            (dict): Package database content.
-        '''
+        dbfile = common.get_sonic_packages_file()
 
-        dbfile = self.get_sonic_packages_file()
         try:
             with open(dbfile) as database:
-                return yaml.safe_load(database)
+                dbcontent = yaml.safe_load(database)
         except OSError as err:
             raise PackageManagerError("Failed to read {}: {}".format(dbfile, err))
 
-    def _commit_db(self, content):
-        ''' Save the database to persistent file.
+        for reponame, repodata in dbcontent.iteritems():
+            self._repository_database[reponame] = Repository(reponame, repodata)
 
-        Args:
-            content (dict): Database content.
-        '''
+    def _commit_db(self):
+        ''' Save the database to persistent file. '''
 
-        dbfile = self.get_sonic_packages_file()
+        dbcontent = dict()
+        dbfile    = common.get_sonic_packages_file()
+
+        for repo in self:
+            dbcontent[repo.get_name()] = repo.get_metadata()
+
         try:
             with open(dbfile, 'w') as database:
-                return yaml.safe_dump(content, database)
+                yaml.safe_dump(dbcontent, database)
         except OSError as err:
             raise PackageManagerError("Failed to write to {}: {}".format(dbfile, err))
 
     def __iter__(self):
-        ''' Iterates over packages in the database.
+        ''' Iterates over repositories in the database.
 
         Yields:
-            package (Package): SONiC Package object
+            Repository: Repository object.
 
         '''
 
-        for name, _ in self._package_database.items():
-            yield self.get_package(name)
+        for name, _ in self._repository_database.items():
+            yield self.get_repository(name)
 

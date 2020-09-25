@@ -1,97 +1,96 @@
 #!/usr/bin/env python
 
-import os
-import json
-import yaml
-import docker
-
-
 from sonic_package_manager.errors import PackageManagerError
+from sonic_package_manager.manifest import get_manifest
+from sonic_package_manager.constraint import (
+    parse_version_constraint,
+    parse_package_constraint,
+)
 
 
 class Package:
-    ''' SONiC package interface '''
+    ''' SONiC Package. '''
 
-    def __init__(self, name, package_data, metadata_path):
-        ''' Create an instance of Pacakge.
+    def __init__(self, repository, manifest):
+        ''' Create an instance of Package.
 
         Args:
-            name (str): Package name.
-            package_data (dict): Database information about this package.
-            metadata_path (str): Path to package metadata.
-        Returns:
-            None.
+            manifest (dict) : Manifest of this package.
         '''
 
-        self._name = name
-        self._package_data = package_data
-        self._metadata_path = metadata_path
-
-    def get_name(self):
-        ''' Returns Package name. '''
-
-        return self._name
+        self._repository = repository
+        self._manifest = manifest
 
     def get_repository(self):
-        ''' Returns Package repository. '''
+        ''' Returns the Repository object for this package.
 
-        return self._package_data["repository"]
-
-    def get_default_version(self):
-        ''' Returns Package default version. '''
-
-        return self._package_data.get("default-version", None)
-
-    def get_description(self):
-        ''' Returns Package description. '''
-
-        return self._package_data.get("description", "N/A")
-
-    def get_installed_version(self):
-        ''' Returns an installed version as string.
-        Returns None if the pacakge is not installed.
+        Returns:
+            Repository: Repository object.
         '''
 
-        return self._package_data.get('version', None)
-
-    def get_status(self):
-        ''' Tell the package status - Installed/Not Installed/Built-In. '''
-
-        if self.is_builtin():
-            return "Built-In"
-        elif self.is_installed():
-            return "Installed"
-        else:
-            return "Not Installed"
+        return self._repository
 
     def get_manifest(self):
-        ''' Returns the manifest content. '''
+        ''' Returns the manifest content.
 
-        base_path = self._metadata_path
-        manifests = [
-            os.path.join(base_path, 'manifest.json'),
-            os.path.join(base_path, 'manifest.yml'),
-            os.path.join(base_path, 'manifest.yaml'),
-        ]
-        for manifest in manifests:
-            try:
-                with open(manifest) as stream:
-                    if manifest.endswith('json'):
-                        return json.load(stream)
-                    else:
-                        return yaml.safe_load(stream)
-            except IOError:
-                continue
+        Returns:
+            dict: Manifest content.
+        '''
 
-        raise PackageManagerError("Failed to locate manifest file")
+        return self._manifest
 
-    def is_builtin(self):
-        ''' Tell if a package is an essential package. '''
+    def get_sonic_version_constraint(self):
+        ''' Returns SONiC version constraint.
 
-        return self._package_data.get("essential", False)
+        Returns:
+            VersionConstraint: SONiC version constraint.
+        '''
 
-    def is_installed(self):
-        ''' Tell if a package is installed. '''
+        manifest = self.get_manifest()
+        package_props = manifest.get('package', dict())
+        # Allow any SONiC version if not defined
+        return parse_version_constraint(package_props.get('sonic-version', '*'))
 
-        return self._package_data.get('status', '') == 'installed'
+    def get_dependencies(self):
+        ''' Returns the dependencies.
+
+        Returns:
+            List[PackageConstraint]: list of dependencies.
+        '''
+
+        dependencies = []
+        manifest = self.get_manifest()
+        package_props = manifest.get('package')
+        if package_props is None:
+            return []
+        for depstring in package_props.get('depends', list()):
+            dependencies.append(parse_package_constraint(depstring))
+
+        return dependencies
+
+    def get_conflicts(self):
+        ''' Returns the list of packages this package breaks.
+
+        Returns:
+            List[PackageConstraint]: list of conflicts.
+        '''
+
+        breaks = []
+        manifest = self.get_manifest()
+        package_props = manifest.get('package')
+        if package_props is None:
+            return []
+        for constraint_expr in package_props.get('breaks', list()):
+            breaks.append(parse_package_constraint(constraint_expr))
+
+        return breaks
+
+    def get_feature_name(self):
+        ''' Returns feature name.
+
+        Returns:
+            str: feature name
+        '''
+
+        return self._manifest['service']['name']
 

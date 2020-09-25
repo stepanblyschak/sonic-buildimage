@@ -19,8 +19,68 @@ class PackageNotFoundError(PackageManagerError):
         return 'Package {} is not found in packages database'.format(self._name)
 
 
+class RepositoryNotFoundError(PackageManagerError):
+    ''' Repository not found in repository database exception '''
+
+    def __init__(self, name):
+        self._name = name
+
+    def __str__(self):
+        return 'Repository {} is not found in packages database'.format(self._name)
+
+
+
 class PackageInstallationError(PackageManagerError):
     ''' Exception for package installation error. '''
 
     pass
+
+
+class PackageRequirementError(PackageInstallationError):
+    ''' Exeception for installation errors, when dependency is missing. '''
+
+    def __init__(self, name, constraint):
+        self._name = name
+        self._constraint = constraint
+
+    def __str__(self):
+        return 'Package {} requirement will not be met: {}'.format(self._name, self._constraint)
+
+class PackageSonicRequirementError(PackageInstallationError):
+    ''' Exeception for installation errors, when SONiC version requirement is not met. '''
+
+    def __init__(self, name, constraint, installed_ver):
+        self._name = name
+        self._constraint = constraint
+        self._installed_ver = installed_ver
+
+    def __str__(self):
+        return 'Package {} requires SONiC compatibility version {} ' \
+               'while the installed version is {}'.format(self._name, self._constraint, self._installed_ver)
+
+
+class PackageDependencyError(PackageInstallationError):
+    ''' Exception calss for installation errors related to missing dependency. '''
+
+    def __init__(self, name, constraint, installed_version=None):
+        self._name = name
+        self._constraint = constraint
+        self._installed_ver = installed_version
+
+    def __str__(self):
+        if self._installed_ver:
+            return 'Package {} requires {} but version {} is installed'.format(self._name, self._constraint, self._installed_ver)
+        return 'Package {} requires {} but it is not installed'.format(self._name, self._constraint)
+
+
+class PackageConflictError(PackageInstallationError):
+    ''' Exception calss for installation errors related to missing dependency. '''
+
+    def __init__(self, name, constraint, installed_ver):
+        self._name = name
+        self._constraint = constraint
+        self._installed_ver = installed_ver
+
+    def __str__(self):
+        return 'Package {} conflicts with {} but version {} is installed'.format(self._name, self._constraint, self._installed_ver)
 

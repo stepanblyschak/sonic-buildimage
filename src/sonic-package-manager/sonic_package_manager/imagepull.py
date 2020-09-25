@@ -3,79 +3,89 @@
 ''' This module implements Docker Image pulling. '''
 
 import docker
-import click
 
-from sonic_package_manager.operation import Operation
 from sonic_package_manager.errors import PackageInstallationError
 from sonic_package_manager.logger import get_logger
 
-class ImagePull(Operation):
-    ''' Pull SONiC Package Docker Image from Docker registry. '''
 
-    def __init__(self, package, version):
-        ''' Initialize ImagePull instance.
+def install_docker_image(docker_client, repository, version):
+    ''' Pull the docker image associated with this repository.
 
-        Args:
-            package (Package): SONiC package object.
-            version (str): SONiC package version to install.
-        Returns:
-            None.
-        '''
+    Args:
+        docker_client (docker.client.DockerClient(): Docker client.
+        repository (Repository): Repository object.
+        version (str): SONiC package version to install.
+    Raises:
+        PackageInstallationError: If the operation fails to download the image.
+    '''
 
-        self._client = docker.from_env()
-        self._package = package
-        self._version = version
+    images  = docker_client.images
+    repourl = repository.get_repository()
+    tag     = str(version)
 
-    def execute(self):
-        ''' Execute the operation, pull the docker image associated
-            with this package from Docker registry.'''
+    get_logger().info('Pulling image {}'.format(repourl))
 
-        images = self._client.images
-        try:
-            get_logger().info('Downloading image {}'.format(self._package.get_repository()))
-            image = images.pull(self._package.get_repository(), self._version)
-            image.tag(self._package.get_repository(), 'latest')
-        except docker.errors.APIError as err:
-            self.restore()
-            raise PackageInstallationError('Failed to download {}: {}'.format(self._package.get_repository(), err))
+    try:
+        image = images.pull(repourl, tag)
+        image.tag(repourl, 'latest')
+    except docker.errors.APIError as err:
+        uninstall_docker_image(docker_client, repository, version)
+        raise PackageInstallationError('Failed to download {}: {}'.format(repourl, err))
 
-    def restore(self):
-        ''' Restore the image pull operation. '''
+    get_logger().info('Image pulled successfully')
 
-        self._remove_runnnig_instances()
-        self._remove_installed_images()
 
-    def _get_image_name(self, tag):
-        ''' Returns the image reference as <repository>:<tag>.
+def uninstall_docker_image(docker_client, repository, version):
+    ''' Revert the image pull operation.
 
-        Args:
-            tag (str): An image tag.
+    Args:
+        docker_client (docker.client.DockerClient(): Docker client.
+        repository (Repository): Repository object.
+        version (str): SONiC package version to install.
+    '''
 
-        Returns:
-            None.
-        '''
+    repourl = repository.get_repository()
+    tag     = str(version)
 
-        return '{}:{}'.format(self._package.get_repository(), tag)
+    _remove_runnnig_instances(docker_client, repourl, tag)
+    _remove_installed_images(docker_client, repourl, tag)
 
-    def _remove_runnnig_instances(self):
-        ''' Remove all running containers created
-            from the package image. '''
 
-        containers = self._client.containers
-        for container in containers.list(all=True):
-            container_image = container.attrs['Config']['Image']
-            if container_image == self._get_image_name('latest'):
-                container.remove(force=True)
+def _get_image_name(repo, tag):
+    ''' Returns the image reference as <repository>:<tag>.
 
-    def _remove_installed_images(self):
-        ''' Removes all installed repository tags of a package. '''
+    Args:
+        repo (str): Repository string.
+        tag (str): An image tag.
 
-        images = self._client.images
-        for image in images.list(all=True):
-            repotags = image.attrs['RepoTags']
-            for tag in repotags:
-                if (tag == self._get_image_name(self._version) or
-                    tag == self._get_image_name('latest')):
-                    get_logger().info('Removing {}'.format(tag))
-                    images.remove(image=tag, force=True)
+    Returns:
+        str: image reference as <repository>:<tag>.
+    '''
+
+    return '{}:{}'.format(repo, tag)
+
+
+def _remove_runnnig_instances(docker_client, repo, tag):
+    ''' Remove all running containers created
+        from the package image. '''
+
+    containers = docker_client.containers
+    for container in containers.list(all=True):
+        container_image = container.attrs['Config']['Image']
+        if (container_image == _get_image_name(repo, 'latest') or
+            container_image == _get_image_name(repo, tag)):
+            container.remove(force=True)
+
+
+def _remove_installed_images(docker_client, repo, tag):
+    ''' Removes all installed repository tags of a package. '''
+
+    images = docker_client.images
+    for image in images.list(all=True):
+        repotags = image.attrs['RepoTags']
+        for repotag in repotags:
+            if (repotag == _get_image_name(repo, tag) or
+                repotag == _get_image_name(repo, 'latest')):
+                get_logger().info('Removing {}'.format(repotag))
+                images.remove(image=repotag, force=True)
 

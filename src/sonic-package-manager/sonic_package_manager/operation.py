@@ -29,3 +29,24 @@ class Operation:
         '''
 
         raise NotImplementedError
+
+
+
+from sonic_package_manager.errors import *
+
+class ReqCheck:
+    def __init__(self, package, database):
+        self._package = package
+        self._database = database
+    def execute():
+        dependencies = self._package.get_dependencies()
+        for dependency in dependencies:
+            if not self._database.has_package(dependency.packagename):
+                raise PackageMissingDependecyError(dependency)
+            package = self._database.get_package(dependency.pkgname)
+            version = package.get_installed_version()
+            if not dependency.versionrange.allows_all(version):
+                raise PackageDependecyVersionError(dependency)
+
+
+

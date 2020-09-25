@@ -10,11 +10,15 @@ import swsssdk
 from sonic_package_manager.errors import PackageInstallationError
 from sonic_package_manager.logger import get_logger
 
+from sonic_package_manager.common import (
+    get_package_metadata_folder,
+)
+
 
 FEATURE_TABLE_NAME = 'FEATURE'
 
 
-def register_feature(connector, repo, version):
+def load_default_config(connector, repo, version):
     ''' Register new feature package.
 
     Args:
@@ -27,22 +31,6 @@ def register_feature(connector, repo, version):
     _update_startup_config(repo, version)
 
     get_logger().info('Registered feature: {}'.format(
-        repo.get_package().get_feature_name()))
-
-
-def deregister_feature(connector, repo, version):
-    ''' Unregister new feature package.
-
-    Args:
-        connector (swsssdk.ConfigDBConnector): Config DB connector
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
-    '''
-
-    _update_startup_config(repo, version, remove=True)
-    _update_running_config(connector, repo, version, remove=True)
-
-    get_logger().info('Deregistered feature: {}'.format(
         repo.get_package().get_feature_name()))
 
 
@@ -66,7 +54,7 @@ def _get_feature_default_configuration(package):
     return table, key, entries
 
 
-def _update_running_config(conn, repo, version, remove=False):
+def _update_running_config(conn, repo):
     ''' Update running configuration database with new feature package.
 
     Args:
@@ -80,6 +68,17 @@ def _update_running_config(conn, repo, version, remove=False):
     '''
 
     package = repo.get_package()
+    init_cfg = package.get_manifest().get('init-config')
+    if init_cfg is None:
+        return
+
+    init_cfg = os.path.join(get_package_metadata_folder(package), init_cfg)
+
+    run_command('sonic-cfggen -j {} --from-db --write-to-db'.format(init_cfg))
+    run_command('sonic-cfggen -j {} -j {} --write-to-db'.format(init_cfg, '/etc/sonic/.json'))
+    
+
+
     table, key, entries = _get_feature_default_configuration(package)
 
     if not remove:
