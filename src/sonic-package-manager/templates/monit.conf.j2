@@ -1,0 +1,15 @@
+###############################################################################
+## Monit configuration for {{ feature }} service
+## process list:
+{%- for process in processes %}
+{%- if process.critical %}
+##  {{ process.name }}
+{%- endif %}
+{%- endfor %}
+###############################################################################
+{%- for process in processes %}
+check process {{ process.name }} matching "{{ process.command }}"
+    if does not exist for 5 times within 5 cycles then alert
+{%- endfor %}
+
+
