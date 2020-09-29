@@ -9,7 +9,7 @@ import natsort
 import yaml
 import docker
 
-import sonic_package_manager.install as installmodule
+from sonic_package_manager.install import install_package, uninstall_package
 
 from sonic_package_manager.database import RepositoryDatabase
 from sonic_package_manager.errors import *
@@ -50,9 +50,14 @@ def repository():
 def list():
     ''' List available repositories. '''
 
-    db = RepositoryDatabase()
     table_header = ["Name", "Repository", "Description", "Version", "Status"]
     table_body = []
+
+    try:
+        db = RepositoryDatabase()
+    except PackageManagerError as err:
+        click.secho('Failed to list repositories: {}'.format(err), fg='red')
+        sys.exit(1)
 
     for repo in db:
         name = repo.get_name()
@@ -135,7 +140,7 @@ def install(name, force):
     try:
         db = RepositoryDatabase()
         repo = db.get_repository(name)
-        installmodule.install(db, repo, force=force)
+        install_package(db, repo, force=force)
     except PackageManagerError as err:
         click.secho('Failed to install package {}: {}'.format(name, err), fg='red')
         sys.exit(1)
@@ -153,7 +158,7 @@ def uninstall(name, force):
     try:
         db = RepositoryDatabase()
         repo = db.get_repository(name)
-        installmodule.uninstall(db, repo, force=force)
+        uninstall_package(db, repo, force=force)
     except PackageManagerError as err:
         click.secho('Failed to uninstall package {}: {}'.format(name, err), fg='red')
         sys.exit(1)

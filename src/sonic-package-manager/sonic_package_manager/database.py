@@ -4,6 +4,8 @@ import os
 import json
 import yaml
 
+from filelock import FileLock, Timeout
+
 from sonic_package_manager import common
 from sonic_package_manager.repository import Repository
 from sonic_package_manager.errors import PackageManagerError, RepositoryNotFoundError
@@ -17,9 +19,24 @@ class RepositoryDatabase:
         Reads the content of packages.yml and loads the database.
         '''
 
+        lockfilepath = common.get_sonic_package_manager_lock_file()
+        self._lock = FileLock(lockfilepath, timeout=0)
+
+        # Aquire a lock, so that only one instance can use the database.
+        # This will ensure, any package or repository database operation
+        # is protected with a lock.
+        try:
+            self._lock.acquire()
+        except Timeout:
+            raise PackageManagerError('Failed to acquire lock file: {}'.format(lockfilepath))
+
         self._repository_database = {}
         self._read_db()
 
+    def __del__(self):
+        ''' Release the lock file. '''
+
+        self._lock.release()
 
     def add_repository(self, name, repository, description='', default_version=None):
         ''' Adds a new repository entry in database.

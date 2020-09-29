@@ -172,7 +172,7 @@ def _check_repository_graph(database, graph):
                 raise PackageConflictError(package_name, conflict, installed_version)
 
 
-def install(database, repository, version=None, force=False):
+def install_package(database, repository, version=None, force=False):
     ''' Install a package from repository. '''
 
     connector = swsssdk.ConfigDBConnector()
@@ -222,7 +222,7 @@ def install(database, repository, version=None, force=False):
 
 
 
-def uninstall(database, repository, force=False):
+def uninstall_package(database, repository, force=False):
     ''' Uninstall a package. '''
 
     connector = swsssdk.ConfigDBConnector()
