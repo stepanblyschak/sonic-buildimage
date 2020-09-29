@@ -104,13 +104,15 @@ def _generate_systemd_service(database, repository):
     requisite = []
     after = []
     before = []
+    wanted_by = []
 
-    unit_attributes = dict(
-        requires=requires,
-        requisite=requisite,
-        after=after,
-        before=before
-    )
+    unit_attributes = {
+        'requires'  : requires,
+        'requisite' : requisite,
+        'after'     : after,
+        'before'    : before,
+        'wanted-by' : wanted_by,
+    }
 
     for unit_attribute, services in unit_attributes.iteritems():
         for unit in service_props.get(unit_attribute, []):
@@ -127,6 +129,7 @@ def _generate_systemd_service(database, repository):
         'requisite'          : requisite,
         'after'              : after,
         'before'             : before,
+        'wanted_by'          : wanted_by,
         'sonic_asic_platform': sonic_asic_platform,
         'user'               : service_user,
         'multi_instance'     : False,

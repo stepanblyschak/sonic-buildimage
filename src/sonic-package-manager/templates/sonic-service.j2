@@ -40,3 +40,6 @@ TimeoutStartSec=150
 
 [Install]
 WantedBy=multi-user.target
+{%- for service in wanted_by %}
+WantedBy={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
+{%- endfor %}
