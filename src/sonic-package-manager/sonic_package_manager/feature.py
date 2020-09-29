@@ -44,7 +44,7 @@ def deregister_feature(connector, repo, version):
         version (str): SONiC package version to install.
     '''
 
-    _update_running_config(connector, repo, version)
+    _update_running_config(connector, repo, version, remove=True)
 
     get_logger().info('Deregistered feature: {}'.format(
         repo.get_package().get_feature_name()))
