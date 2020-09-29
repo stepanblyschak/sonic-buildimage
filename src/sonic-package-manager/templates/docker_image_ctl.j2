@@ -309,7 +309,9 @@ start() {
         -e SX_API_SOCKET_FILE=/var/run/sx_sdk/sx_api.sock \
         -v /dev/shm:/dev/shm:rw \
 {%- else %}
+{%- if not no_default_tmpfs_volume|default(False) %}
         --tmpfs /tmp \
+{%- endif %}
 {%- endif %}
 {%- endif %}
 {%- if sonic_asic_platform == "broadcom" %}
