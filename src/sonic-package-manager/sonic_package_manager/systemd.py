@@ -147,8 +147,6 @@ def _generate_service_mgmt_script(database, repository):
     ''' Generate service management script under /usr/local/bin/<package-name>.sh '''
 
     package = repository.get_package()
-    dependent_services = []
-    multiasic_dependent_services = []
     peer_service_name = package.get_manifest()['service'].get('peer', '')
     service_name = package.get_feature_name()
     sonic_asic_platform = get_sonic_version_info()['asic_type']
@@ -156,8 +154,6 @@ def _generate_service_mgmt_script(database, repository):
     render_template(get_template(SERVICE_MGMT_SCRIPT_TEMPLATE),
         get_service_mgmt_script_path(package),
         {
-            'dependent_services'          : dependent_services,
-            'multiasic_dependent_services': multiasic_dependent_services,
             'peer_service_name'           : peer_service_name,
             'service_name'                : service_name,
             'sonic_asic_platform'         : sonic_asic_platform,
