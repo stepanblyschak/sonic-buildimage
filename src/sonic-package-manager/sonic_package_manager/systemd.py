@@ -191,14 +191,14 @@ def _update_dependent_list(repository, remove=False):
         for filepattern in files:
             with open(os.path.join(ETC_SONIC_PATH, filepattern.format(service)), 'a+') as f:
                 f.seek(0)
-                dependent = f.read().strip().split()
+                dependent = set(f.read().strip().split())
                 if remove:
                     try:
                         dependent.remove(service_name)
                     except ValueError:
                         pass
                 else:
-                    dependent.append(service_name)
+                    dependent.add(service_name)
                 f.seek(0)
                 f.truncate()
                 f.write(' '.join(dependent))
