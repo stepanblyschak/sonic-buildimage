@@ -16,6 +16,14 @@ setup(
     packages=[
         'sonic_package_manager',
     ],
+    install_requires = [
+        'jinja2>=2.10',
+        'pyyaml',
+        'click',
+        'docker',
+        'sonic-py-common',
+        'swsssdk',
+    ],
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
     classifiers = [
         'Intended Audience :: Developers',
