@@ -1,7 +1,12 @@
 #!/bin/bash
 
-DEPENDENT="radv dhcp_relay"
-MULTI_INST_DEPENDENT="teamd"
+SERVICE="swss"
+PEER="syncd"
+DEBUGLOG="/tmp/swss-syncd-debug$DEV.log"
+LOCKFILE="/tmp/swss-syncd-lock$DEV"
+NAMESPACE_PREFIX="asic"
+DEPENDENT="radv dhcp_relay $(cat /etc/sonic/${SERVICE}_dependent))"
+MULTI_INST_DEPENDENT="teamd $(cat /etc/sonic/${SERVICE}_multi_inst_dependent)"
 
 function debug()
 {
@@ -222,11 +227,6 @@ stop() {
 
 DEV=$2
 
-SERVICE="swss"
-PEER="syncd"
-DEBUGLOG="/tmp/swss-syncd-debug$DEV.log"
-LOCKFILE="/tmp/swss-syncd-lock$DEV"
-NAMESPACE_PREFIX="asic"
 if [ "$DEV" ]; then
     NET_NS="$NAMESPACE_PREFIX$DEV" #name of the network namespace
     SONIC_DB_CLI="sonic-db-cli -n $NET_NS"
