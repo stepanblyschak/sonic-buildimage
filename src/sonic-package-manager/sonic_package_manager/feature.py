@@ -91,7 +91,8 @@ def _update_running_config(conn, repo, version, remove=False):
     table, key, entries = _get_feature_default_configuration(package)
 
     if not remove:
-        conn.mod_entry(table, key, entries)
+        if not conn.get_entry(table, key):
+            conn.mod_entry(table, key, entries)
     else:
         entries = conn.get_entry(table, key)
         if entries.get('state', '') == 'enabled':
