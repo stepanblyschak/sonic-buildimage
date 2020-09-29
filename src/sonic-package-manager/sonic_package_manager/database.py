@@ -119,7 +119,7 @@ class RepositoryDatabase:
             return True
         except RepositoryNotFoundError:
             return False
-    
+
     def is_package_installed(self, featurename):
         ''' Checks if the database contains an entry for a repository called name
         and it is installed. Returns True if the package, otherwise False.
@@ -136,7 +136,7 @@ class RepositoryDatabase:
             package = repo.get_package()
             if package.get_feature_name() == featurename:
                 return True
-        
+
         return False
 
     def _read_db(self):

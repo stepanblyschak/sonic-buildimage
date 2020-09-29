@@ -12,7 +12,7 @@ from sonic_package_manager.common import (
     get_template,
     run_command,
 )
-from sonic_package_manager.errors import PackageInstallationError 
+from sonic_package_manager.errors import PackageInstallationError
 
 
 MONIT_CONF_TEMPLATE = 'monit.conf.j2'
