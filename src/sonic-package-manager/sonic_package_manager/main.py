@@ -2,6 +2,7 @@
 
 import os
 import sys
+import functools
 import click
 import tabulate
 import natsort
@@ -12,6 +13,23 @@ import sonic_package_manager.install as installmodule
 
 from sonic_package_manager.database import RepositoryDatabase
 from sonic_package_manager.errors import *
+
+
+def root_privileged_required(func):
+    ''' Decorates a function, so that the function is invoked
+    only if the user is root. '''
+
+    @functools.wraps(func)
+    def wrapped_function(*args, **kwargs):
+        ''' Wrapper around func. '''
+
+        if os.geteuid() != 0:
+            click.secho('Root privileges required for this operation', fg='red')
+            sys.exit(1)
+
+        return func(*args, **kwargs)
+
+    return wrapped_function
 
 
 @click.group()
@@ -80,12 +98,10 @@ def show_manifest(name):
 @click.argument('repository', type=str)
 @click.option('--default-version', type=str)
 @click.option('--description', type=str)
+@root_privileged_required
 def add(name, repository, default_version, description):
     ''' Add a new repository to database. '''
 
-    if os.geteuid() != 0:
-        click.secho('Root privileges required for this operation', fg='red')
-        sys.exit(1)
     try:
         db = RepositoryDatabase()
         db.add_repository(name, repository, description=description, default_version=default_version)
@@ -96,12 +112,10 @@ def add(name, repository, default_version, description):
 
 @repository.command()
 @click.argument("name")
+@root_privileged_required
 def remove(name):
     ''' Remove a package from database. '''
 
-    if os.geteuid() != 0:
-        click.secho('Root privileges required for this operation', fg='red')
-        sys.exit(1)
     try:
         db = RepositoryDatabase()
         db.remove_repository(name)
@@ -113,12 +127,10 @@ def remove(name):
 @cli.command()
 @click.option('--force', is_flag=True)
 @click.argument('name')
+@root_privileged_required
 def install(name, force):
     ''' Install a package. '''
 
-    if os.geteuid() != 0:
-        click.secho('Root privileges required for this operation', fg='red')
-        sys.exit(1)
     click.secho('Request to install {}. force: {}'.format(name, force), fg='green')
     try:
         db = RepositoryDatabase()
@@ -133,12 +145,10 @@ def install(name, force):
 @cli.command()
 @click.option('--force', is_flag=True)
 @click.argument('name')
+@root_privileged_required
 def uninstall(name, force):
     ''' Uninstall a package. '''
 
-    if os.geteuid() != 0:
-        click.secho('Root privileges required for this operation', fg='red')
-        sys.exit(1)
     click.secho('Request to uninstall {}. force: {}'.format(name, force), fg='green')
     try:
         db = RepositoryDatabase()
