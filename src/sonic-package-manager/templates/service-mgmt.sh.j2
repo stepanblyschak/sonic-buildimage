@@ -5,10 +5,20 @@
 # generated from /usr/share/sonic/templates/service-mgmt.sh.j2 using sonic-package-manager
 #
 
-DEPENDENT="{{ dependent_services | default([]) | join(' ') }}"
-MULTI_INST_DEPENDENT="{{ multiasic_dependent_services | default([]) | join(' ') }}"
 SERVICE="{{ service_name }}"
 PEER="{{ peer_service_name | default('') }}"
+
+if [[ -f /etc/sonic/${SERVICE}_dependent ]]; then
+    DEPENDENT="$(cat /etc/sonic/${SERVICE}_dependent)"
+else
+    DEPENDENT=""
+fi
+
+if [[ -f /etc/sonic/${SERVICE}_multi_inst_dependent ]]; then
+    MULTI_INST_DEPENDENT="cat /etc/sonic/${SERVICE}_multi_inst_dependent"
+else
+    MULTI_INST_DEPENDENT=""
+fi
 
 if [[ ! -z $DEV ]]; then
     DEBUGLOG="/tmp/$SERVICE_$DEV.log"
