@@ -21,6 +21,7 @@ setup(
         'pyyaml',
         'click',
         'docker',
+        'filelock',
         'sonic-py-common',
         'swsssdk',
     ],

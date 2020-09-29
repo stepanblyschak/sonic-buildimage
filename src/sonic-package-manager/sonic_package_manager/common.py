@@ -21,6 +21,12 @@ def get_sonic_packages_file():
     return os.path.join(SONIC_PACKAGE_MANAGER_PATH, 'packages.yml')
 
 
+def get_sonic_package_manager_lock_file():
+    ''' Return the lock file path in SONiC OS. '''
+
+    return os.path.join(SONIC_PACKAGE_MANAGER_PATH, 'lock')
+
+
 def get_package_metadata_folder(package):
     ''' Return a base path for package. '''
 
