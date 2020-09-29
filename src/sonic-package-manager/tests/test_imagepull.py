@@ -4,10 +4,11 @@ import docker
 import mock
 import pytest
 import semver
+
+from sonic_package_manager import imagepull
+from sonic_package_manager.package import Package
+from sonic_package_manager.repository import Repository
 from sonic_package_manager.errors import *
-from sonic_package_manager.imagepull import *
-from sonic_package_manager.package import *
-from sonic_package_manager.repository import *
 
 
 def test_imagepull_installation():
@@ -25,9 +26,7 @@ def test_imagepull_installation():
     image.tag = mock.Mock()
     docker_client.images.pull = mock.Mock(return_value=image)
 
-    imagepull = ImagePull(docker_client)
-
-    imagepull.install(repo, version)
+    imagepull.install_docker_image(docker_client, repo, version)
 
     docker_client.images.pull.assert_called_once_with('host:port/image', '1.0.0')
     image.tag.assert_called_once_with('host:port/image', 'latest')
@@ -46,7 +45,5 @@ def test_imagepull_uninstallation():
     docker_client.containers.list = mock.MagicMock()
     docker_client.images.list = mock.MagicMock()
 
-    imagepull = ImagePull(docker_client)
-
-    imagepull.uninstall(repo, version)
+    imagepull.uninstall_docker_image(docker_client, repo, version)
 
