@@ -147,6 +147,8 @@ def _generate_service_mgmt_script(database, repository):
     ''' Generate service management script under /usr/local/bin/<package-name>.sh '''
 
     package = repository.get_package()
+    dependent_services = []
+    multiasic_dependent_services = []
     peer_service_name = package.get_manifest()['service'].get('peer', '')
     service_name = package.get_feature_name()
     sonic_asic_platform = get_sonic_version_info()['asic_type']
@@ -154,6 +156,8 @@ def _generate_service_mgmt_script(database, repository):
     render_template(get_template(SERVICE_MGMT_SCRIPT_TEMPLATE),
         get_service_mgmt_script_path(package),
         {
+            'dependent_services'          : dependent_services,
+            'multiasic_dependent_services': multiasic_dependent_services,
             'peer_service_name'           : peer_service_name,
             'service_name'                : service_name,
             'sonic_asic_platform'         : sonic_asic_platform,
@@ -208,8 +212,9 @@ def _generate_docker_ctl_script(repository):
     repository = repository.get_repository()
     manifest = package.get_manifest()
     container_props = manifest['container']
-    run_opt = []
     sonic_asic_platform = get_sonic_version_info()['asic_type']
+    no_default_tmpfs_volume = container_props.get('no_default_tmpfs_volume', False)
+    run_opt = []
 
     if container_props.get('privileged', False):
         run_opt.append('--privileged')
@@ -224,16 +229,17 @@ def _generate_docker_ctl_script(repository):
 
     for envname, value in container_props.get('environment', dict()).iteritems():
         run_opt.append('-e {}={}'.format(envname, value))
-    
+
     run_opt = ' '.join(run_opt)
 
     render_template(get_template(DOCKER_CTL_SCRIPT_TEMPLATE),
         get_docker_ctl_script_path(package),
         {
-            'docker_container_name': name,
-            'docker_image_name'    : repository,
-            'docker_image_run_opt' : run_opt,
-            'sonic_asic_platform'  : sonic_asic_platform,
+            'docker_container_name'   : name,
+            'docker_image_name'       : repository,
+            'docker_image_run_opt'    : run_opt,
+            'sonic_asic_platform'     : sonic_asic_platform,
+            'no_default_tmpfs_volume' : no_default_tmpfs_volume,
         }
     )
 
