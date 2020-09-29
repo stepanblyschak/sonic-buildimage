@@ -36,3 +36,7 @@ def load_default_config(repo):
     init_cfg = os.path.join(get_package_metadata_folder(repo), init_cfg)
 
     run_command('sonic-cfggen -j {} --write-to-db'.format(init_cfg))
+
+    # TODO: instead of config save, we could update only
+    #       needed tables in /etc/sonic/config_db.json
+    run_command('config save -y')
