@@ -29,14 +29,13 @@ def skip_if_force_install_requested(func):
         if 'force' in kwargs:
             force = kwargs.pop('force')
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         except PackageInstallationError as err:
             if force:
                 get_logger().warn('Ignoring error: {}'.format(err))
             else:
                 raise
 
-        return wrapped_function
     return wrapped_function
 
 
