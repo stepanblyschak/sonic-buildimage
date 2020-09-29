@@ -10,7 +10,7 @@ import swsssdk
 from sonic_py_common.device_info import get_sonic_version_info
 
 from sonic_package_manager import constraint
-from sonic_package_manager import feature, imagepull, metadata, monit, systemd
+from sonic_package_manager import feature, imagepull, metadata, monit, systemd, initcfg
 from sonic_package_manager.database import RepositoryDatabase
 from sonic_package_manager.errors import *
 from sonic_package_manager.logger import get_logger
@@ -27,8 +27,7 @@ def skip_if_force_install_requested(func):
     def wrapped_function(*args, **kwargs):
         force = False
         if 'force' in kwargs:
-            kwargs.pop('force')
-            force = True
+            force = kwargs.pop('force')
         try:
             func(*args, **kwargs)
         except PackageInstallationError as err:
@@ -203,6 +202,8 @@ def install(database, repository, version=None, force=False):
 
         repository.update_installation_status('installed', version)
         database.update_repository(repository)
+
+        initcfg.load_default_config(repository)
 
     except PackageInstallationError as err:
         # restore
