@@ -5,8 +5,16 @@ PEER="syncd"
 DEBUGLOG="/tmp/swss-syncd-debug$DEV.log"
 LOCKFILE="/tmp/swss-syncd-lock$DEV"
 NAMESPACE_PREFIX="asic"
-DEPENDENT="radv dhcp_relay $(cat /etc/sonic/${SERVICE}_dependent))"
-MULTI_INST_DEPENDENT="teamd $(cat /etc/sonic/${SERVICE}_multi_inst_dependent)"
+
+DEPENDENT="radv dhcp_relay"
+if [[ -f /etc/sonic/${SERVICE}_dependent ]]; then
+    DEPENDENT="$DEPENDENT $(cat /etc/sonic/${SERVICE}_dependent)"
+fi
+
+MULTI_INST_DEPENDENT="teamd"
+if [[ -f /etc/sonic/${SERVICE}_multi_inst_dependent ]]; then
+    MULTI_INST_DEPENDENT="$MULTI_INST_DEPENDENT $(cat /etc/sonic/${SERVICE}_multi_inst_dependent)"
+fi
 
 function debug()
 {
