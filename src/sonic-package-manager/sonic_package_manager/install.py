@@ -42,7 +42,8 @@ def skip_if_force_install_requested(func):
 def get_sonic_compatibility_version():
     ''' Returns: SONiC compatiblity version string. '''
 
-    return get_sonic_version_info()['sonic_compatibility_version']
+    version = get_sonic_version_info()['sonic_compatibility_version']
+    return constraint.Version.parse(version)
 
 
 @skip_if_force_install_requested
@@ -179,7 +180,6 @@ def install_package(database, repository, version=None, force=False):
     docker_client = docker.from_env()
 
     sonicver = get_sonic_compatibility_version()
-    sonicver = constraint.Version.parse(sonicver)
 
     if version is None:
         version = repository.get_default_version()
