@@ -34,9 +34,8 @@ class PackageConstraint:
     def __eq__(self, other):
         return self.name == other.name and self.constraint == other.constraint
 
-    @property
     def __str__(self):
-        return f'{self.name} {self.constraint}'
+        return f'{self._name} {self._constraint}'
 
 
 def parse_version(version_string: str) -> Version:

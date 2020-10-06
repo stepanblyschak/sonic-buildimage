@@ -2,6 +2,7 @@
 
 
 import logging
+import logging.handlers
 import click_log
 
 
@@ -25,7 +26,7 @@ click_handler = click_log.ClickHandler()
 click_handler.formatter = Formatter()
 
 logger.addHandler(click_handler)
-logger.addHandler(logging.handler.SysLogHandler)
+logger.addHandler(logging.handlers.SysLogHandler())
 
 
 def get_logger() -> logging.Logger:
