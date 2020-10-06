@@ -24,15 +24,19 @@ def load_default_config(connectors: typing.Dict[typing.Optional[str], swsssdk.Co
     if init_cfg is None:
         return
 
-    for namespace, connector in connectors.items():
-        if multi_asic.is_multi_asic() and package.is_asic_service():
-            if namespace.startswith('asic'):
-                connector.connect()
-                connector.mod_config(init_cfg)
-        if not multi_asic.is_multi_asic() or package.is_host_service():
+    if multi_asic.is_multi_asic() and package.is_asic_service():
+        for namespace, connector in connectors.items():
             if namespace == 'host':
-                connector.connect()
-                connector.mod_config(init_cfg)
+                continue
+            connector.connect()
+            connector.mod_config(init_cfg)
+
+    if not multi_asic.is_multi_asic() or package.is_host_service():
+        for namespace, connector in connectors.items():
+            if namespace != 'host':
+                continue
+            connector.connect()
+            connector.mod_config(init_cfg)
 
     # TODO: update persistent config db seperately
     common.run_command('config save -y')
