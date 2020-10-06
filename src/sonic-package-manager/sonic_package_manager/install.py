@@ -1,27 +1,27 @@
 #!/usr/bin/env python
 
-import copy
 import functools
-import os
-import shutil
+import typing
+
 import docker
 import swsssdk
 
 from sonic_py_common.device_info import get_sonic_version_info
 
-from sonic_package_manager import constraint
-from sonic_package_manager import feature, imagepull, metadata, monit, systemd, initcfg
-from sonic_package_manager.database import RepositoryDatabase
+from sonic_package_manager import database
+from sonic_package_manager import constraint, repository
+from sonic_py_common import multi_asic
+from sonic_package_manager import feature, image, metadata, monit, systemd, initcfg
 from sonic_package_manager.errors import *
 from sonic_package_manager.logger import get_logger
 
 
 def skip_if_force_install_requested(func):
-    ''' Decorates a function, so that if force keyword
+    """ Decorates a function, so that if force keyword
     argument is passed and the value is True, the exception
     is suppressed and warning is printed but the operation
     continues.
-    '''
+    """
 
     @functools.wraps(func)
     def wrapped_function(*args, **kwargs):
@@ -32,110 +32,189 @@ def skip_if_force_install_requested(func):
             return func(*args, **kwargs)
         except PackageInstallationError as err:
             if force:
-                get_logger().warn('Ignoring error: {}'.format(err))
+                get_logger().warning(f'Ignoring error: {err}')
             else:
                 raise
 
     return wrapped_function
 
 
+def install_package(database, repository, version=None, force=False):
+    """ Install a package from repository. """
+
+    name = repository.get_name()
+    version = version or repository.get_default_version()
+    sonicver = get_sonic_compatibility_version()
+
+    docker_client = docker.from_env()
+    connectors = _get_db_connectors()
+    host_db_connector = connectors[None]
+
+    get_logger().info(_get_installation_request_msg(name, version, force))
+
+    check_package_is_not_installed(repository, force=force)
+
+    try:
+        image.pull(docker_client, repository, version)
+        metadata.install_metadata(docker_client, repository)
+
+        check_sonic_version_compatibility(repository, sonicver, force=force)
+        check_installation(database, repository, version, force=force)
+
+        systemd.install_service(database, repository)
+        monit.generate_monit_conf(repository)
+        feature.register(host_db_connector, repository)
+
+        repository.update_installation_status('installed', version)
+        database.update_repository(repository)
+
+        initcfg.load_default_config(connectors, repository)
+
+    except PackageInstallationError as err:
+        feature.deregister(host_db_connector, repository)
+        monit.remove_monit_conf(repository)
+        systemd.uninstall_service(repository)
+
+        metadata.uninstall_metadata(repository)
+        image.remove(docker_client, repository, version)
+
+        # re-raise exception
+        raise
+
+    get_logger().info(f'Package {name} is succesfully installed!')
+
+
+def uninstall_package(database, repository, force=False):
+    """ Uninstall a package. """
+
+    name = repository.get_name()
+    version = repository.get_installed_version()
+
+    docker_client = docker.from_env()
+    connectors = _get_db_connectors()
+    host_db_connector = connectors[None]
+
+    get_logger().info(f'Request to uninstall {name}')
+
+    check_package_is_installed(repository, force=force)
+
+    check_uninstallation(database, repository, version, force=force)
+
+    feature.deregister(host_db_connector, repository)
+    monit.generate_monit_conf(repository)
+    systemd.uninstall_service(repository)
+
+    metadata.uninstall_metadata(repository)
+    image.remove(docker_client, repository, version)
+
+    repository.update_installation_status('not-installed', None)
+    database.update_repository(repository)
+
+    get_logger().info(f'Package {name} succesfully uninstalled!')
+
+
 def get_sonic_compatibility_version():
-    ''' Returns: SONiC compatiblity version string. '''
+    """ Returns: SONiC compatibility version string. """
 
     version = get_sonic_version_info()['sonic_compatibility_version']
     return constraint.Version.parse(version)
 
 
 @skip_if_force_install_requested
-def check_sonic_version_compatibility(repository, sonicver):
-    ''' Verify SONiC base image version meets the requirement
+def check_sonic_version_compatibility(repo: repository.Repository,
+                                      sonicver: constraint.Version):
+    """ Verify SONiC base image version meets the requirement
     of the package.
 
     Args:
-        package (Package): Package object.
+        repo: Repository object.
+        sonicver: SONiC compatibility version number.
     Raises:
         PackageSonicRequirementError: if requirement is not met.
-    '''
+    """
 
-    package = repository.get_package()
+    package = repo.get_package()
     version_constraint = package.get_sonic_version_constraint()
     if not version_constraint.allows_all(sonicver):
-        raise PackageSonicRequirementError(repository.get_name(), version_constraint, sonicver)
+        raise PackageSonicRequirementError(repo.get_name(), version_constraint, sonicver)
 
 
 @skip_if_force_install_requested
-def check_installation(database, repository, version):
-    ''' Verify that package dependencies are satisfied
+def check_installation(database: database.RepositoryDatabase,
+                       repo: repository.Repository,
+                       version: constraint.Version):
+    """ Verify that package dependencies are satisfied
     and the installation won't break any other package.
 
     Args:
-        database (RepositoryDatabase): Repository database.
-        repository (Repository): Repository that is going to be installed.
-        version (Version): Version to install.
+        database:  Repository database.
+        repo: Repository that is going to be installed.
+        version: Version to install.
     Raises:
         PackageDependencyError: Raised when the dependency is not installed
-            or does not match the version pattern.
+                                or does not match the version pattern.
         PackageConflictError: Raised when the package conflicts with another package.
-    '''
+    """
 
-    graph = _build_repository_graph(database)
+    deps_dict = _build_repository_deps_dict(database)
 
-    name = repository.get_name()
-    package = repository.get_package()
+    name = repo.get_name()
+    package = repo.get_package()
     dependencies = package.get_dependencies()
     conflicts = package.get_conflicts()
 
-    graph[name] = {
+    deps_dict[name] = {
         'dependencies': dependencies,
         'conflicts': conflicts,
         'version': version
     }
-
-    _check_repository_graph(database, graph)
+    _check_repository_deps_dict(deps_dict)
 
 
 @skip_if_force_install_requested
-def check_uninstallation(database, repository, version):
-    ''' Verify that all package dependencies will be satisfied
+def check_uninstallation(database: database.RepositoryDatabase,
+                         repo: repository.Repository):
+    """ Verify that all package dependencies will be satisfied
     after the installation.
 
     Args:
-        database (RepositoryDatabase): Repository database.
-        repository (Repository): Repository that is going to be installed.
-        version (Version): Version to install.
+        database:  Repository database.
+        repo: Repository that is going to be installed.
+        version: Version to install.
     Raises:
         PackageDependencyError: Raised when the dependency is not installed
             or does not match the version pattern.
         PackageConflictError: Raised when the package conflicts with another package.
-    '''
+    """
 
-    graph = _build_repository_graph(database)
-
-    name = repository.get_name()
-
+    deps_dict = _build_repository_deps_dict(database)
+    name = repo.get_name()
     try:
-        graph.pop(name)
+        deps_dict.pop(name)
     except KeyError:
         pass
-
-    _check_repository_graph(database, graph)
+    _check_repository_deps_dict(deps_dict)
 
 
 @skip_if_force_install_requested
 def check_package_is_not_installed(repository):
     if repository.is_installed():
-        raise PackageInstallationError(('{} is already installed, uninstall'
-            ' first if you try to upgrade.').format(repository.get_name()))
+        raise PackageInstallationError(
+            f'{repository.get_name()} is already installed, uninstall'
+            f' first if you try to upgrade.'
+        )
 
 
 @skip_if_force_install_requested
 def check_package_is_installed(repository):
     if not repository.is_installed():
-        raise PackageInstallationError('{} is not installed.'.format(repository.get_name()))
+        raise PackageInstallationError(
+            f'{repository.get_name()} is not installed.'
+        )
 
 
-def _build_repository_graph(database):
-    graph = dict()
+def _build_repository_deps_dict(database):
+    deps_dict = dict()
 
     for repo in database:
         if not repo.is_installed():
@@ -146,100 +225,54 @@ def _build_repository_graph(database):
         dependencies = pkg.get_dependencies()
         conflicts = pkg.get_conflicts()
 
-        graph[repo.get_name()] = {
+        deps_dict[repo.get_name()] = {
             'dependencies': dependencies,
             'conflicts': conflicts,
             'version': version,
         }
 
-    return graph
+    return deps_dict
 
 
-def _check_repository_graph(database, graph):
-    for package_name, info in graph.iteritems():
+def _check_repository_deps_dict(deps_dict):
+    for package_name, info in deps_dict.items():
         for dependency in info['dependencies']:
-            if dependency.name not in graph:
+            if dependency.name not in deps_dict:
                 raise PackageDependencyError(package_name, dependency)
 
-            installed_version = graph[dependency.name]['version']
+            installed_version = deps_dict[dependency.name]['version']
             if not dependency.constraint.allows_all(installed_version):
                 raise PackageDependencyError(package_name, dependency, installed_version)
         for conflict in info['conflicts']:
-            if conflict.name not in graph:
+            if conflict.name not in deps_dict:
                 continue
 
-            installed_version = graph[conflict.name]['version']
+            installed_version = deps_dict[conflict.name]['version']
             if conflict.constraint.allows_all(installed_version):
                 raise PackageConflictError(package_name, conflict, installed_version)
 
 
-def install_package(database, repository, version=None, force=False):
-    ''' Install a package from repository. '''
+def _get_installation_request_msg(name, version, force):
+    """ Return the installation request log message. """
 
-    connector = swsssdk.ConfigDBConnector()
-    docker_client = docker.from_env()
+    msg = 'requested'
+    if force:
+        msg = msg + ' force'
+    msg += f' installation of {name}'
+    if version:
+        msg += f' version {version}'
 
-    sonicver = get_sonic_compatibility_version()
-
-    if version is None:
-        version = repository.get_default_version()
-
-    connector.connect()
-
-    check_package_is_not_installed(repository, force=force)
-
-    try:
-        imagepull.install_docker_image(docker_client, repository, version)
-        metadata.install_metadata(docker_client, repository, version)
-
-        check_sonic_version_compatibility(repository, sonicver, force=force)
-        check_installation(database, repository, version, force=force)
-
-        systemd.install_service(database, repository)
-        monit.install_monit_conf(repository)
-        feature.register_feature(connector, repository, version)
-
-        repository.update_installation_status('installed', version)
-        database.update_repository(repository)
-
-        initcfg.load_default_config(repository)
-
-    except PackageInstallationError as err:
-        # restore
-        try:
-            feature.deregister_feature(connector, repository, version)
-            monit.uninstall_monit_conf(repository)
-            systemd.uninstall_service(repository)
-
-            metadata.uninstall_metadata(repository, version)
-            imagepull.uninstall_docker_image(docker_client, repository, version)
-        except PackageManagerError as err:
-            get_logger().error(err)
-            # continue restoring
-
-        # re-raise exception
-        raise err
+    return msg
 
 
+def _get_db_connectors() -> typing.Dict[typing.Optional[str], swsssdk.ConfigDBConnector]:
+    """ Returns: a dict of CONFIG DB connectors (namespace -> connector). """
 
-def uninstall_package(database, repository, force=False):
-    ''' Uninstall a package. '''
+    result = {None: swsssdk.ConfigDBConnector()}
 
-    connector = swsssdk.ConfigDBConnector()
-    docker_client = docker.from_env()
-    version = None
+    for roles, namespaces in multi_asic.get_all_namespaces():
+        for namespace in namespaces:
+            result[namespace] = swsssdk.ConfigDBConnector(namespace=namespace)
 
-    connector.connect()
+    return result
 
-    check_package_is_installed(repository, force=force)
-    check_uninstallation(database, repository, version, force=force)
-
-    feature.deregister_feature(connector, repository, version)
-    monit.uninstall_monit_conf(repository)
-    systemd.uninstall_service(repository)
-
-    metadata.uninstall_metadata(repository, version)
-    imagepull.uninstall_docker_image(docker_client, repository, version)
-
-    repository.update_installation_status('not-installed', None)
-    database.update_repository(repository)

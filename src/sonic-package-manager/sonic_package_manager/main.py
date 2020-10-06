@@ -1,31 +1,42 @@
 #!/usr/bin/env python
 
+import functools
 import os
 import sys
-import functools
+import typing
+
 import click
+import click_log
 import tabulate
-import natsort
 import yaml
-import docker
+from natsort import natsorted
 
-from sonic_package_manager.install import install_package, uninstall_package
-
+from sonic_package_manager import errors
 from sonic_package_manager.database import RepositoryDatabase
-from sonic_package_manager.errors import *
+from sonic_package_manager.install import install_package, uninstall_package
+from sonic_package_manager.logger import get_logger
 
 
-def root_privileged_required(func):
-    ''' Decorates a function, so that the function is invoked
-    only if the user is root. '''
+BULLET_UC = '\u2022'
+
+
+def exit_cli(*args, **kwargs):
+    """ Print a message and exit with rc 1. """
+
+    click.secho(*args, **kwargs)
+    sys.exit(1)
+
+
+def root_privileged_required(func: typing.Callable) -> typing.Callable:
+    """ Decorates a function, so that the function is invoked
+    only if the user is root. """
 
     @functools.wraps(func)
     def wrapped_function(*args, **kwargs):
-        ''' Wrapper around func. '''
+        """ Wrapper around func. """
 
         if os.geteuid() != 0:
-            click.secho('Root privileges required for this operation', fg='red')
-            sys.exit(1)
+            exit_cli('Root privileges required for this operation', fg='red')
 
         return func(*args, **kwargs)
 
@@ -34,32 +45,45 @@ def root_privileged_required(func):
 
 @click.group()
 def cli():
-    ''' SONiC Package Manager. '''
+    """ SONiC Package Manager. """
 
     pass
 
 
 @cli.group()
 def repository():
-    ''' Repository management commands. '''
+    """ Repository management commands. """
 
     pass
 
 
-@repository.command()
+@cli.group()
+def package():
+    """ SONiC Package commands. """
+
+    pass
+
+
+@package.group()
+def show():
+    """ Package show CLI commands. """
+
+    pass
+
+
+@cli.command()
 def list():
-    ''' List available repositories. '''
+    """ List available repositories. """
 
     table_header = ["Name", "Repository", "Description", "Version", "Status"]
     table_body = []
 
     try:
         db = RepositoryDatabase()
-    except PackageManagerError as err:
-        click.secho('Failed to list repositories: {}'.format(err), fg='red')
-        sys.exit(1)
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to list repositories: {err}', fg='red')
 
-    for repo in db:
+    for repo in natsorted(db):
         name = repo.get_name()
         repository = repo.get_repository()
         description = repo.get_description()
@@ -81,21 +105,46 @@ def list():
     click.echo(tabulate.tabulate(table_body, table_header))
 
 
-@cli.command()
+@show.command()
 @click.argument('name')
-def show_manifest(name):
-    ''' Print the manifest content. '''
+def manifest(name):
+    """ Print the manifest content. """
 
     try:
         db = RepositoryDatabase()
         repo = db.get_repository(name)
         if not repo.is_installed():
-            raise PackageManagerError('{} is not installed'.format(name))
+            raise errors.PackageManagerError(f'{name} is not installed')
         pkg = repo.get_package()
         click.echo(yaml.safe_dump(pkg.get_manifest()))
-    except PackageManagerError as err:
-        click.secho('Failed to describe package {}: {}'.format(name, err), fg='red')
-        sys.exit(1)
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to describe package {name}: {err}', fg='red')
+
+
+@show.command()
+@click.argument('name')
+def changelog(name):
+    """ Print the package changelog. """
+
+    try:
+        db = RepositoryDatabase()
+        repo = db.get_repository(name)
+        if not repo.is_installed():
+            raise errors.PackageManagerError(f'{name} is not installed')
+        pkg = repo.get_package()
+        changelog = pkg.get_changelog()
+
+        if changelog is None:
+            raise errors.PackageManagerError(f'No changelog for package {name}')
+
+        for version in sorted(changelog):
+            click.secho(f'{version}:', fg='green', bold=True)
+            for line in changelog[version]:
+                click.secho(f'    {BULLET_UC} {line}', bold=True)
+            click.secho('')
+
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to print package changelog: {err}', fg='red')
 
 
 @repository.command()
@@ -105,66 +154,73 @@ def show_manifest(name):
 @click.option('--description', type=str)
 @root_privileged_required
 def add(name, repository, default_version, description):
-    ''' Add a new repository to database. '''
+    """ Add a new repository to database. """
 
     try:
         db = RepositoryDatabase()
         db.add_repository(name, repository, description=description, default_version=default_version)
-    except PackageManagerError as err:
-        click.secho('Failed to add repository {}: {}'.format(name, err), fg='red')
-        sys.exit(1)
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to add repository {name}: {err}', fg='red')
 
 
 @repository.command()
 @click.argument("name")
 @root_privileged_required
 def remove(name):
-    ''' Remove a package from database. '''
+    """ Remove a package from database. """
 
     try:
         db = RepositoryDatabase()
         db.remove_repository(name)
-    except PackageManagerError as err:
-        click.secho('Failed to remove repository {}: {}'.format(name, err), fg='red')
-        sys.exit(1)
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to remove repository {name}: {err}', fg='red')
 
 
 @cli.command()
 @click.option('--force', is_flag=True)
-@click.argument('name')
+@click.option('--yes', is_flag=True)
+@click.argument('pattern')
+@click_log.simple_verbosity_option(get_logger())
 @root_privileged_required
-def install(name, force):
-    ''' Install a package. '''
+def install(pattern, force, yes):
+    """ Install a package. """
 
-    click.secho('Request to install {}. force: {}'.format(name, force), fg='green')
+    name = pattern
+    version = None
+
+    if '==' in pattern:
+        name, version = pattern.split('==', 1)
+
+    (not yes or force) or click.confirm(
+        f'Package {pattern} is going to be installed, continue?', abort=True, show_default=True)
+
     try:
         db = RepositoryDatabase()
         repo = db.get_repository(name)
-        install_package(db, repo, force=force)
-    except PackageManagerError as err:
-        click.secho('Failed to install package {}: {}'.format(name, err), fg='red')
-        sys.exit(1)
-    click.secho('Package {} succesfully installed!'.format(name), fg='green')
+        install_package(db, repo, version=version, force=force)
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to install package {name}: {err}', fg='red')
 
 
 @cli.command()
 @click.option('--force', is_flag=True)
+@click.option('--yes', is_flag=True)
 @click.argument('name')
+@click_log.simple_verbosity_option(get_logger())
 @root_privileged_required
-def uninstall(name, force):
-    ''' Uninstall a package. '''
+def uninstall(name, force, yes):
+    """ Uninstall a package. """
 
-    click.secho('Request to uninstall {}. force: {}'.format(name, force), fg='green')
+    (not yes or force) or click.confirm(
+        f'Package {name} is going to be uninstalled, continue?', abort=True, show_default=True)
+
     try:
         db = RepositoryDatabase()
         repo = db.get_repository(name)
         uninstall_package(db, repo, force=force)
-    except PackageManagerError as err:
-        click.secho('Failed to uninstall package {}: {}'.format(name, err), fg='red')
-        sys.exit(1)
-    click.secho('Package {} succesfully uninstalled!'.format(name), fg='green')
+    except errors.PackageManagerError as err:
+        exit_cli(f'Failed to uninstall package {name}: {err}', fg='red')
 
 
 if __name__ == "__main__":
     cli()
-

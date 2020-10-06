@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import semver
+""" Package versioning constraints. """
 
-from collections import namedtuple
+import semver
 
 
 Version = semver.Version
@@ -10,15 +10,15 @@ VersionConstraint = semver.VersionConstraint
 
 
 class PackageConstraint:
-    ''' PackageConstraint is a package version constraint. '''
+    """ PackageConstraint is a package version constraint. """
 
-    def __init__(self, name, constraint, positive=True):
-        ''' Intiailize PackageConstraint.
+    def __init__(self, name: str, constraint: VersionConstraint):
+        """ Initialize PackageConstraint.
 
         Args:
-            name       (str): Name of the package.
-            constraint (VersionConstraint): Version constraint of the requirement.
-        '''
+            name: Name of the package.
+            constraint: Version constraint of the requirement.
+        """
 
         self._name = name
         self._constraint = constraint
@@ -34,45 +34,43 @@ class PackageConstraint:
     def __eq__(self, other):
         return self.name == other.name and self.constraint == other.constraint
 
+    @property
     def __str__(self):
-        return '{} {}'.format(self.name, self.constraint)
+        return f'{self.name} {self.constraint}'
 
 
-def invert_version_constraint(constraint):
-    ''' Inverts version constraint.
-    If intput is '>1.0.0', the output will be '<=1.0.0'.
-
-    Args:
-        constraint (VersionConstraint): input constraint
-    Returns:
-        (VersionConstraint): inverted constraint.
-    '''
-
-    return parse_version_constraint('*').difference(constraint)
-
-
-def parse_version_constraint(constraint_expression):
-    ''' Parse version constraint.
+def parse_version(version_string: str) -> Version:
+    """ Parse version string.
 
     Args:
-        constraint_expression (str): Expression syntax: "[[op][version]]+".
+        version_string: Version string.
     Returns:
-        VersionConstraint: The resulting VersionConstraint object.
-    '''
+        Version object.
+    """
+
+    return Version.parse(version_string)
+
+
+def parse_version_constraint(constraint_expression: str) -> VersionConstraint:
+    """ Parse version constraint.
+
+    Args:
+        constraint_expression: Expression syntax: "[[op][version]]+".
+    Returns:
+        The resulting VersionConstraint object.
+    """
 
     return semver.parse_constraint(constraint_expression)
 
 
-
-def parse_package_constraint(constraint_expression):
-    ''' Parse "dependency" string.
+def parse_package_constraint(constraint_expression: str) -> PackageConstraint:
+    """ Parse "dependency" string.
 
     Args:
-        constraint_expression (str): Expression syntax "[packagename] [[op][version]]+".
-        positive (bool): Whether to create a positive constraint.
+        constraint_expression: Expression syntax "[package name] [[op][version]]+".
     Returns:
-        PackageConstraint: PackageConstraint object.
-    '''
+        PackageConstraint object.
+    """
 
     pkgrequirement = list(reversed(constraint_expression.strip().split(' ', 1)))
     pkgname = pkgrequirement.pop()

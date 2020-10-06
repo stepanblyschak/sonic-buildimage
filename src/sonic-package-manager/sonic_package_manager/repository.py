@@ -1,81 +1,87 @@
 #!/usr/bin/env python
+import json
+import os
+import typing
 
-from sonic_package_manager.errors import PackageManagerError
-from sonic_package_manager.package import Package
-from sonic_package_manager.manifest import get_manifest
-from sonic_package_manager.constraint import (
-    parse_version_constraint,
-    parse_package_constraint,
-)
+import yaml
+
+from sonic_package_manager import constraint, common
+from sonic_package_manager import package
+from sonic_package_manager.logger import get_logger
 
 
 class Repository:
-    ''' Repository entry. '''
+    """ Repository entry. """
 
-    def __init__(self, name, metadata):
-        ''' Create an instance of Repository.
+    def __init__(self, name: str, metadata: typing.Dict):
+        """ Create an instance of Repository.
 
         Args:
-            name     (str)  : Repository name.
-            metadata (dict) : Database information about this repository.
-        '''
+            name: Repository name.
+            metadata: Database information about this repository.
+        """
 
-        self._name     = name
+        self._name = name
         self._metadata = metadata
 
-    def get_name(self):
-        ''' Returns package name.
+    def get_name(self) -> str:
+        """ Returns package name.
 
         Returns:
-            str: Repository name string.
-        '''
+            Repository name string.
+        """
 
         return self._name
 
-    def get_repository(self):
-        ''' Returns repository url.
+    def get_repository(self) -> str:
+        """ Returns repository url.
 
         Returns:
-            str: Repository url string.
-        '''
+            Repository url string.
+        """
 
         return self._metadata['repository']
 
-    def get_default_version(self):
-        ''' Returns repository default installation candidate.
+    def get_default_version(self) -> constraint.VersionConstraint:
+        """ Returns repository default installation candidate.
 
         Returns:
-            (VersionConstraint): Default repositiry installation candidate.
-        '''
+            Default repository installation candidate.
+        """
 
-        return parse_version_constraint(self._metadata['default-version'])
+        default_version_string = self._metadata['default-version']
+        return constraint.parse_version_constraint(default_version_string)
 
-    def get_description(self):
-        ''' Returns repository description.
+    def get_description(self) -> str:
+        """ Returns repository description string.
 
         Returns:
-            str: Repository description string. May return None.
-                 if package entry does not have description field.
-        '''
+            Repository description string. May return None.
+            if package entry does not have description field.
+        """
 
         return self._metadata.get('description')
 
-    def get_installed_version(self):
-        ''' Returns an installed version as string.
-        Returns None if the package is not installed.
+    def get_installed_version(self) -> typing.Optional[constraint.Version]:
+        """ Returns an installed version as string.
 
         Returns:
-            (semver.Version): Installed package version.
-        '''
+            Installed package version.
+        """
 
-        return parse_version_constraint(self._metadata['version'])
+        try:
+            ver = self._metadata['version']
+        except KeyError:
+            return None
 
-    def get_status(self):
-        ''' Tells the respository status - Installed/Not Installed/Built-In.
+        return constraint.Version.parse(ver)
+
+    def get_status(self) -> str:
+        """ Tells the repository status - Installed/Not Installed/Built-In.
 
         Returns:
-            str: repository installation status string.
-        '''
+            Repository installation status string.
+        """
 
         if self.is_builtin():
             return "Built-In"
@@ -84,53 +90,99 @@ class Repository:
         else:
             return "Not Installed"
 
-    def get_metadata(self):
-        ''' Returns repository metadata it was initialized with.
+    def get_metadata(self) -> typing.Dict:
+        """ Returns repository metadata it was initialized with.
 
         Returns:
-            dict: repository metadata.
-        '''
+            repository metadata.
+        """
 
         return self._metadata
 
-    def is_builtin(self):
-        ''' Tells if a repository is essential.
+    def is_builtin(self) -> bool:
+        """ Tells if a repository is essential.
 
         Returns:
-            bool: True if the repository is essential, False otherwise.
-        '''
+            True if the repository is essential, False otherwise.
+        """
 
         return self._metadata.get("essential", False)
 
-    def is_installed(self):
-        ''' Tells if a repository is installed.
+    def is_installed(self) -> bool:
+        """ Tells if a repository is installed.
 
         Returns:
-            bool: True if the repository is installed, False otherwise.
-        '''
+            True if the repository is installed, False otherwise.
+        """
 
         return self._metadata.get('status') == 'installed'
 
-    def get_package(self):
-        ''' Return an instance of Package.
+    def get_package(self) -> package.Package:
+        """ Return an instance of Package.
 
         Returns:
-            Package: Package object corresponding to this package entry.
+            Package object corresponding to this package entry.
 
         Raises:
             PackageManagerError: If the package manifest is not found.
-        '''
+        """
 
-        return Package(self, get_manifest(self))
+        manifest_content = self.get_manifest()
+        return package.Package(manifest_content)
 
-    def update_installation_status(self, status, version=None):
-        ''' Updates status of the Repository.
+    def update_installation_status(self, status: str,
+                                   version: typing.Optional[constraint.Version] = None):
+        """ Updates status of the Repository.
 
         Args:
-            status (str): 'installed' or 'not-installed' string.
-            version (str): version of installed package.
-        '''
+            status: 'installed' or 'not-installed' string.
+            version: version of installed package.
+        """
 
         self._metadata['status'] = status
         self._metadata['version'] = str(version)
 
+    def get_manifest(self) -> typing.Dict:
+        """ Reads the content of package manifest. If no manifest file
+        found in Docker Image returns a default one.
+
+        Returns:
+            manifest content as a dictionary.
+        """
+
+        name = self.get_name()
+        package_path = common.get_package_metadata_folder(name)
+
+        manifests_locations = [
+            os.path.join(package_path, 'manifest.json'),
+            os.path.join(package_path, 'manifest.yml'),
+            os.path.join(package_path, 'manifest.yaml'),
+        ]
+
+        for manifest in manifests_locations:
+            try:
+                with open(manifest) as stream:
+                    if manifest.endswith('.json'):
+                        return json.load(stream)
+                    else:
+                        return yaml.safe_load(stream)
+            except IOError:
+                continue
+
+        get_logger().warning(f'Failed to locate manifest file for {name}, using default manifest')
+
+        # Return a default one, which service name is the package name
+        # and host-only service flag is set. If there is no manifest it
+        # is assumed we are installing an arbitrary Docker image that can
+        # run on Linux host so it most probably has nothing to do with ASIC.
+        return {
+            'version': '1.0.0',
+            'service': {
+                'name': f'{name}',
+                'host-service': True,
+                'asic-service': False,
+            }
+        }
+
+    def __lt__(self, other):
+        return self.get_name() < other.get_name()

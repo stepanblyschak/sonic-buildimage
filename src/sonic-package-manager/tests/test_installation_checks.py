@@ -1,14 +1,14 @@
 import pytest
 import mock
 
-from sonic_package_manager.repository import *
 from sonic_package_manager.database import *
+from sonic_package_manager.errors import PackageSonicRequirementError, PackageDependencyError, PackageConflictError
+from sonic_package_manager.install import check_sonic_version_compatibility, check_installation
 from sonic_package_manager.package import *
-from sonic_package_manager.errors import *
-from sonic_package_manager.install import *
 from sonic_package_manager.constraint import *
 
-from mockdb import *
+from tests.mockdb import create_mock_repo, MockDatabase
+
 
 @pytest.mark.parametrize(
     "req,sonicver,raises",
