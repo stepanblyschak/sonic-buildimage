@@ -12,9 +12,9 @@ class Formatter(click_log.ColorFormatter):
         'error': dict(fg='red'),
         'exception': dict(fg='red'),
         'critical': dict(fg='red'),
-        'debug': dict(fg='blue'),
+        'debug': dict(fg='blue', bold=True),
         'warning': dict(fg='yellow'),
-        'info': dict(fg='green'),
+        'info': dict(fg='green', bold=True),
     }
 
 
@@ -25,6 +25,7 @@ click_handler = click_log.ClickHandler()
 click_handler.formatter = Formatter()
 
 logger.addHandler(click_handler)
+logger.addHandler(logging.handler.SysLogHandler)
 
 
 def get_logger() -> logging.Logger:
