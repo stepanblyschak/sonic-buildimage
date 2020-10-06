@@ -46,6 +46,9 @@ def install_package(database, repository, version=None, force=False):
     version = version or repository.get_default_version()
     sonicver = get_sonic_compatibility_version()
 
+    if version is None:
+        raise PackageInstallationError(f'No installation version for {name}')
+
     docker_client = docker.from_env()
     connectors = _get_db_connectors()
     host_db_connector = connectors['host']
@@ -71,6 +74,8 @@ def install_package(database, repository, version=None, force=False):
         initcfg.load_default_config(connectors, repository)
 
     except PackageInstallationError as err:
+        get_logger().error(f'Installation failed: {err}')
+
         feature.deregister(host_db_connector, repository)
         monit.remove_monit_conf(repository)
         systemd.uninstall_service(repository)
@@ -102,7 +107,7 @@ def uninstall_package(database, repository, force=False):
     check_uninstallation(database, repository, force=force)
 
     feature.deregister(host_db_connector, repository)
-    monit.generate_monit_conf(repository)
+    monit.remove_monit_conf(repository)
     systemd.uninstall_service(repository)
 
     metadata.uninstall_metadata(repository)

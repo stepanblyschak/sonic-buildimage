@@ -42,14 +42,16 @@ class Repository:
 
         return self._metadata['repository']
 
-    def get_default_version(self) -> constraint.VersionConstraint:
+    def get_default_version(self) -> typing.Optional[constraint.VersionConstraint]:
         """ Returns repository default installation candidate.
 
         Returns:
             Default repository installation candidate.
         """
 
-        default_version_string = self._metadata['default-version']
+        default_version_string = self._metadata.get('default-version')
+        if default_version_string is None:
+            return default_version_string
         return constraint.parse_version_constraint(default_version_string)
 
     def get_description(self) -> str:
