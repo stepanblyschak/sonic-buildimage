@@ -34,7 +34,7 @@ def test_load_default_config(asic_service, host_service, is_multi_asic):
 
     # global connector
     connector = mock.Mock(swsssdk.ConfigDBConnector)
-    connectors[None] = connector
+    connectors['host'] = connector
 
     # connectors per namespace
     if is_multi_asic:

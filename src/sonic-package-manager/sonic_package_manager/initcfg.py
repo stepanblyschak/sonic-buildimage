@@ -26,11 +26,11 @@ def load_default_config(connectors: typing.Dict[typing.Optional[str], swsssdk.Co
 
     for namespace, connector in connectors.items():
         if multi_asic.is_multi_asic() and package.is_asic_service():
-            if namespace:
+            if namespace.startswith('asic'):
                 connector.connect()
                 connector.mod_config(init_cfg)
         if not multi_asic.is_multi_asic() or package.is_host_service():
-            if namespace is None:
+            if namespace == 'host':
                 connector.connect()
                 connector.mod_config(init_cfg)
 

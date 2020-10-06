@@ -48,7 +48,7 @@ def install_package(database, repository, version=None, force=False):
 
     docker_client = docker.from_env()
     connectors = _get_db_connectors()
-    host_db_connector = connectors[None]
+    host_db_connector = connectors['host']
 
     get_logger().info(_get_installation_request_msg(name, version, force))
 
@@ -92,7 +92,7 @@ def uninstall_package(database, repository, force=False):
 
     docker_client = docker.from_env()
     connectors = _get_db_connectors()
-    host_db_connector = connectors[None]
+    host_db_connector = connectors['host']
 
     get_logger().info(f'Request to uninstall {name}')
 
@@ -268,7 +268,9 @@ def _get_installation_request_msg(name, version, force):
 def _get_db_connectors() -> typing.Dict[typing.Optional[str], swsssdk.ConfigDBConnector]:
     """ Returns: a dict of CONFIG DB connectors (namespace -> connector). """
 
-    result = {None: swsssdk.ConfigDBConnector()}
+    # Assumption: all namespaces in SONiC are asic$N and there is no namespace called 'host'
+    # so we can use 'host' as a key for host DB connector instead of None key.
+    result = {'host': swsssdk.ConfigDBConnector()}
 
     for roles, namespaces in multi_asic.get_all_namespaces():
         for namespace in namespaces:

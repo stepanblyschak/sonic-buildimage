@@ -16,28 +16,6 @@ def manifest_one_process():
 def manifest_no_processes():
     return {'service': {'name': 'test_service'}}
 
-
-def test_monit_template():
-    with open('../templates/monit.conf.j2') as template:
-        monit_template = jinja2.Template(template.read())
-
-    monit_conf = monit_template.render({'feature': 'test',
-                                        'processes': [
-                                            {'name': 'test_daemon',
-                                             'command': '/usr/bin/test_daemon -j -w',
-                                             'critical': True}]})
-    expected_output = \
-        '''###############################################################################
-## Monit configuration for test service
-## process list:
-##  test_daemon
-###############################################################################
-check process test_daemon matching "/usr/bin/test_daemon -j -w"
-    if does not exist for 5 times within 5 cycles then alert
-'''
-    assert expected_output == monit_conf
-
-
 def test_monit_install():
     repo = mock.Mock(repository.Repository)
     manifest = {'service': {'name': 'test_service'},
