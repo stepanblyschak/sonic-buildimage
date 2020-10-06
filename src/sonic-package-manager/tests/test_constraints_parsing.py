@@ -4,6 +4,7 @@ import pytest
 
 from sonic_package_manager.constraint import *
 
+
 @pytest.mark.parametrize(
     'inputstr,result',
     [

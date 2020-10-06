@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-from setuptools import setup
 import glob
+
+from setuptools import setup
 
 setup(
     name='sonic-package-manager',
@@ -19,9 +20,11 @@ setup(
     install_requires = [
         'jinja2>=2.10',
         'pyyaml',
+        'tabulate',
+        'poetry-semver',
         'click',
+        'click_log',
         'docker',
-        'filelock',
         'sonic-py-common',
         'swsssdk',
     ],

@@ -2,15 +2,10 @@
 # =============== Managed by SONiC Package Manager. DO NOT EDIT! ===============
 # generated from /usr/share/sonic/templates/sonic-service.j2 using sonic-package-manager
 #
-{%- if name != 'database' %}
 {%- set path = '/usr/local/bin' %}
-{%- else %}
-{%- set path = '/usr/bin' %}
-{%- endif %}
 [Unit]
 Description={{ description }}
 {%- for service in requires %}
-{#- Some services in belofw Requires, Requisite, etc. might not be multi-asic services #}
 Requires={{ service.name }}{% if multi_instance and service.is_package %}@%i{% endif %}.service
 {%- endfor %}
 {%- for service in requisite %}
@@ -34,9 +29,6 @@ ExecStart={{path}}/{{name}}.sh wait{% if multi_instance %} %i{% endif %}
 ExecStop={{path}}/{{name}}.sh stop{% if multi_instance %} %i{% endif %}
 Restart=always
 RestartSec=30
-{%- if name == "syncd" %}
-TimeoutStartSec=150
-{%- endif %}
 
 [Install]
 WantedBy=multi-user.target

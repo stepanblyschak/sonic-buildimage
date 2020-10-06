@@ -1,7 +1,8 @@
 import mock
 import semver
 
-from sonic_package_manager.repository import *
+from sonic_package_manager.constraint import parse_package_constraint
+from sonic_package_manager.package import Package
 from sonic_package_manager.database import *
 
 class MockDatabase(RepositoryDatabase):

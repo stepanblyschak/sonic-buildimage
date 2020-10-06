@@ -1,79 +1,77 @@
 #!/usr/bin/env python
 
-''' MetadataInstall implements copying SONiC package metadata to host filesystem. '''
+""" MetadataInstall implements copying SONiC package metadata to host filesystem. """
 
 import io
 import os
 import shutil
 import tarfile
+import typing
 
 import docker
 
+from sonic_package_manager import repository
 from sonic_package_manager.common import (get_package_image_metadata_folder,
                                           get_package_metadata_folder)
-from sonic_package_manager.database import RepositoryDatabase
 from sonic_package_manager.errors import PackageInstallationError
 from sonic_package_manager.logger import get_logger
 
 
-
-def install_metadata(docker_client, repository, version):
-    ''' Copy SONiC package metadata folder.
+def install_metadata(docker_client: docker.api.APIClient,
+                     repo: repository.Repository):
+    """ Copy SONiC package metadata folder.
 
     Args:
-        docker_client (docker.client.DockerClient): Docker client
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
+        docker_client: Docker client
+        repository: Repository object.
     Raises:
         PackageInstallationError: If the operation fails.
-    '''
+    """
 
     get_logger().info('Copying package metadata...')
 
     # cleanup left overs first
-    _remove_package_folder(repository)
+    _remove_package_folder(repo)
 
-    _create_package_folder(repository)
-    tar = _get_package_metadata_tar(docker_client, repository)
-    _save_package_metadata(repository, tar)
+    _create_package_folder(repo)
+    tar = _get_package_metadata_tar(docker_client, repo)
+    _save_package_metadata(repo, tar)
 
 
-def uninstall_metadata(repository, version):
-    ''' Remove SONiC package metadata folder.
+def uninstall_metadata(repository: repository.Repository):
+    """ Remove SONiC package metadata folder.
 
     Args:
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
+        repository: Repository object.
     Raises:
         PackageInstallationError: If the operation fails.
-    '''
+    """
 
     _remove_package_folder(repository)
     get_logger().info('Removed package metadata...')
 
 
-def _create_package_folder(repo):
-    ''' Creates a dedicated folder for package metadata.
+def _create_package_folder(repo: repository.Repository):
+    """ Creates a dedicated folder for package metadata.
 
     Args:
-        repo (Repository): Repository object.
-    '''
+        repo: Repository object.
+    """
 
     try:
-        os.makedirs(get_package_metadata_folder(repo))
+        os.makedirs(get_package_metadata_folder(repo.get_name()))
     except OSError as err:
-        raise PackageInstallationError('Failed to create a package metadata folder: {}'.format(err))
+        raise PackageInstallationError(f'Failed to create a package metadata folder: {err}')
 
 
-def _remove_package_folder(repository):
-    ''' Removes the folder with package metadata.
+def _remove_package_folder(repository: repository.Repository):
+    """ Removes the folder with package metadata.
 
     Args:
-        repo (Repository): Repository object.
-    '''
+        repository: Repository object.
+    """
 
-
-    metadatafolder = get_package_metadata_folder(repository)
+    metadatafolder = get_package_metadata_folder(repository.get_name())
 
     if not os.path.exists(metadatafolder):
         return
@@ -81,17 +79,19 @@ def _remove_package_folder(repository):
     try:
         shutil.rmtree(metadatafolder)
     except OSError as err:
-        raise PackageInstallationError('Failed to remove package metadata: {}'.format(err))
+        raise PackageInstallationError(f'Failed to remove package metadata: {err}')
 
 
-def _get_package_metadata_tar(docker_client, repo):
-    ''' Returns a file object of a tar archive with package metadata.
+def _get_package_metadata_tar(docker_client: docker.api.APIClient,
+                              repo: repository.Repository) -> typing.BinaryIO:
+    """ Returns a file object of a tar archive with package metadata.
 
     Args:
-        repo (Repository): Repository object.
+        docker_client: Docker API client.
+        repo: Repository object.
     Returns:
-        file: file-like object of tar archive content.
-    '''
+        file-like object of tar archive content.
+    """
 
     image = '{}:{}'.format(repo.get_repository(), 'latest')
     buf = bytes()
@@ -107,30 +107,28 @@ def _get_package_metadata_tar(docker_client, repo):
             buf += chunk
     except docker.errors.APIError as err:
         raise PackageInstallationError('Failed to copy package metadata. '
-                'Is this image an SONiC package?: {}'.format(err))
+                                       'Is this image an SONiC package?: {}'.format(err))
     finally:
         container.remove(force=True)
 
     return io.BytesIO(buf)
 
 
-def _save_package_metadata(repo, tar):
-    ''' Save package metadata object on host OS filesystem.
+def _save_package_metadata(repo: repository.Repository, tar: typing.BinaryIO):
+    """ Save package metadata object on host OS filesystem.
 
     Args:
-        repo (Repository): Repository object.
-        tar (file): Tar archive.
-    '''
+        repo: Repository object.
+        tar: Tar archive.
+    """
 
     with tarfile.open(fileobj=tar) as tar:
         for member in tar:
             relativepath = os.path.relpath(member.name,
-                os.path.basename(get_package_image_metadata_folder()))
+                                           os.path.basename(get_package_image_metadata_folder()))
             # omit the folder itself, copy all the content of the folder
             if relativepath == os.curdir:
                 continue
-            get_logger().info('Copying package metadata: {}'.format(relativepath))
+            get_logger().info(f'Copying package metadata: {relativepath}')
             member.name = relativepath
-            tar.extract(member, get_package_metadata_folder(repo))
-
-
+            tar.extract(member, get_package_metadata_folder(repo.get_name()))

@@ -1,42 +1,39 @@
 #!/usr/bin/env python
 
-''' This module implements the logic of feature registration and deregistration in CONFIG DB. '''
+""" This module laoding default package configuration in to CONFIG DB. """
 
-import os
-import json
+import typing
 
 import swsssdk
+from sonic_py_common import multi_asic
 
-from sonic_package_manager.errors import PackageInstallationError
-from sonic_package_manager.logger import get_logger
-
-from sonic_package_manager.common import (
-    get_package_metadata_folder,
-    run_command,
-)
+from sonic_package_manager import common, repository
 
 
-FEATURE_TABLE_NAME = 'FEATURE'
-
-
-def load_default_config(repo):
-    ''' Register new feature package.
+def load_default_config(connectors: typing.Dict[typing.Optional[str], swsssdk.ConfigDBConnector],
+                        repo: repository.Repository):
+    """ Loads default configuration into CONFIG DB.
 
     Args:
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
-    '''
+        connectors: List of CONFIG DB connectors.
+        repo: Repository object.
+    """
 
     package = repo.get_package()
-    package_props = package.get_manifest().get('package', dict())
-    init_cfg = package_props.get('initial-config')
+    init_cfg = package.get_initial_config()
     if init_cfg is None:
         return
 
-    init_cfg = os.path.join(get_package_metadata_folder(repo), init_cfg)
+    for namespace, connector in connectors.items():
+        if multi_asic.is_multi_asic() and package.is_asic_service():
+            if namespace:
+                connector.connect()
+                connector.mod_config(init_cfg)
+        if not multi_asic.is_multi_asic() or package.is_host_service():
+            if namespace is None:
+                connector.connect()
+                connector.mod_config(init_cfg)
 
-    run_command('sonic-cfggen -j {} --write-to-db'.format(init_cfg))
+    # TODO: update persistent config db seperately
+    common.run_command('config save -y')
 
-    # TODO: instead of config save, we could update only
-    #       needed tables in /etc/sonic/config_db.json
-    run_command('config save -y')

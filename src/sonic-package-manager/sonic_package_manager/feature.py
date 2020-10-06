@@ -1,100 +1,106 @@
 #!/usr/bin/env python
 
-''' This module implements the logic of feature registration and deregistration in CONFIG DB. '''
+""" This module implements the logic of feature registration and de-registration in CONFIG DB. """
 
-import os
-import json
+import typing
 
 import swsssdk
 
-from sonic_package_manager.errors import PackageInstallationError
+from sonic_package_manager import common
+from sonic_package_manager import package
+from sonic_package_manager import repository
 from sonic_package_manager.logger import get_logger
-
-from sonic_package_manager.common import run_command
-
 
 FEATURE_TABLE_NAME = 'FEATURE'
 
 
-def register_feature(connector, repo, version):
-    ''' Register new feature package.
+def register(connector: swsssdk.ConfigDBConnector,
+             repo: repository.Repository):
+    """ Register new feature package.
 
     Args:
-        connector (swsssdk.ConfigDBConnector): Config DB connector
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
-    '''
+        connector: Config DB connector.
+        repo: Repository object.
+    """
 
-    _update_running_config(connector, repo, version)
+    pkg = repo.get_package()
+    table = FEATURE_TABLE_NAME
+    key = pkg.get_feature_name()
+    cfg_entries = get_configurable_feature_entries(pkg)
+    non_cfg_entries = get_non_configurable_feature_entries(pkg)
 
-    get_logger().info('Registered feature: {}'.format(
-        repo.get_package().get_feature_name()))
+    connector.connect()
 
-    # TODO: instead of config save, we could update only
-    #       needed tables in /etc/sonic/config_db.json
-    run_command('config save -y')
+    running_cfg = connector.get_entry(table, key)
 
+    cfg = cfg_entries.copy()
+    # Override configurable entries with CONFIG DB data.
+    cfg.update(running_cfg)
+    # Override CONFIG DB data with non configurable entries.
+    cfg.update(non_cfg_entries)
 
-def deregister_feature(connector, repo, version):
-    ''' Unregister new feature package.
+    connector.mod_entry(table, key, cfg)
 
-    Args:
-        connector (swsssdk.ConfigDBConnector): Config DB connector
-        repository (Repository): Repository object.
-        version (str): SONiC package version to install.
-    '''
+    common.run_command('config save -y')
 
-    _update_running_config(connector, repo, version, remove=True)
-
-    get_logger().info('Deregistered feature: {}'.format(
-        repo.get_package().get_feature_name()))
-
-    # TODO: instead of config save, we could update only
-    #       needed tables in /etc/sonic/config_db.json
-    run_command('config save -y')
+    get_logger().info(f'Registered feature: {key}')
 
 
-def _get_feature_default_configuration(package):
-    ''' Returns default feature configuration.
+def deregister(connector: swsssdk.ConfigDBConnector,
+               repo: repository.Repository):
+    """ Register new feature package.
 
     Args:
-        package (Package): Package object.
+        connector: Config DB connector.
+        repo: Repository object.
+    """
+
+    pkg = repo.get_package()
+    table = FEATURE_TABLE_NAME
+    key = pkg.get_feature_name()
+
+    connector.connect()
+    connector.set_entry(table, key, None)
+
+    # TODO: update persistent config db seperately
+    common.run_command('config save -y')
+
+    get_logger().info(f'De-registered feature: {key}')
+
+
+def get_configurable_feature_entries(pkg: package.Package) \
+        -> typing.Dict[str, str]:
+    """
+    Get configurable feature table entries: e.g. 'state', 'auto_restart', etc..
+
+    Args:
+        pkg: Package object.
 
     Returns:
-        Tuple (table (str), key (str), entries (entries))
-    '''
+        Dictionary of field values.
+    """
 
-    table   = FEATURE_TABLE_NAME
-    key     = package.get_feature_name()
-    entries = dict(state='disabled',
-                    has_timer=False, # TODO: include timer if needed
-                    auto_restart='enabled',
-                    high_mem_alert='disabled')
-
-    return table, key, entries
+    return {
+        'state': 'disabled',
+        'auto_restart': 'enabled',
+        'high_mem_alert': 'disabled',
+    }
 
 
-def _update_running_config(conn, repo, version, remove=False):
-    ''' Update running configuration database with new feature package.
+def get_non_configurable_feature_entries(pkg: package.Package) \
+        -> typing.Dict[str, str]:
+    """
+    Get non-configurable feature table entries: e.g. 'has_timer'.
 
     Args:
-        connector (swsssdk.ConfigDBConnector): Config DB connector
-        repository (Repository): Repository object.
-        version    (str)       : SONiC package version to install.
-        remove     (bool)      : If true, removes feature from DB, othewise adds.
-    Raises:
-        PackageInstallationError: raises when feature gets removed, but in
-                                    config db it is enabled.
-    '''
+        pkg: Package object.
 
-    package = repo.get_package()
-    table, key, entries = _get_feature_default_configuration(package)
+    Returns:
+        Dictionary of field values.
+    """
 
-    if not remove:
-        if not conn.get_entry(table, key):
-            conn.mod_entry(table, key, entries)
-    else:
-        entries = conn.get_entry(table, key)
-        if entries.get('state', '') == 'enabled':
-            raise PackageInstallationError('Package feature is enabled, cannot remove. Disable the feature first.')
-        conn.set_entry(FEATURE_TABLE_NAME, package.get_feature_name(), None)
+    return {
+        'has_per_asic_scope': str(pkg.is_asic_service()),
+        'has_global_scope': str(pkg.is_host_service()),
+        'has_timer': 'False',  # TODO: include timer if package requires
+    }
