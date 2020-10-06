@@ -191,8 +191,9 @@ def install(pattern, force, yes):
     if '==' in pattern:
         name, version = pattern.split('==', 1)
 
-    (not yes or force) or click.confirm(
-        f'Package {pattern} is going to be installed, continue?', abort=True, show_default=True)
+    if not yes and not force:
+        click.confirm(f'Package {pattern} is going to be installed, '
+                      f'continue?', abort=True, show_default=True)
 
     try:
         db = RepositoryDatabase()
@@ -211,8 +212,9 @@ def install(pattern, force, yes):
 def uninstall(name, force, yes):
     """ Uninstall a package. """
 
-    (not yes or force) or click.confirm(
-        f'Package {name} is going to be uninstalled, continue?', abort=True, show_default=True)
+    if not yes and not force:
+        click.confirm(f'Package {name} is going to be uninstalled, '
+                      f'continue?', abort=True, show_default=True)
 
     try:
         db = RepositoryDatabase()
