@@ -87,6 +87,23 @@ def get_configurable_feature_entries(pkg: package.Package) \
     }
 
 
+def is_feature_enabled(connector: swsssdk.ConfigDBConnector,
+                       repository: repository.Repository) -> bool:
+    """ Check if the feature is enabled or not.
+    Args:
+        connector: CONFIG DB connector.
+        repository: Repository object.
+
+    Returns:
+        True if enabled, otherwise False.
+    """
+
+    connector.connect()
+    name = repository.get_package().get_feature_name()
+    state = connector.get_entry(FEATURE_TABLE_NAME, name).get('state')
+    return state == 'enabled'
+
+
 def get_non_configurable_feature_entries(pkg: package.Package) \
         -> typing.Dict[str, str]:
     """
