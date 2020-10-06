@@ -11,11 +11,11 @@ from sonic_package_manager import common
 from sonic_package_manager.logger import get_logger
 from sonic_package_manager.errors import PackageInstallationError
 
-SERVICE_FILE_TEMPLATE = 'sonic.service.sh.j2'
+SERVICE_FILE_TEMPLATE = 'sonic.service.j2'
 SERVICE_FILE_LOCATION = os.path.join('/', 'usr', 'lib', 'systemd', 'system')
 SERVICE_MGMT_SCRIPT_TEMPLATE = 'service_mgmt.sh.j2'
 SERVICE_MGMT_SCRIPT_LOCATION = os.path.join('/', 'usr', 'local', 'bin')
-DOCKER_CTL_SCRIPT_TEMPLATE = 'docker_image_ctl.j2'
+DOCKER_CTL_SCRIPT_TEMPLATE = 'docker_image_ctl.sh.j2'
 DOCKER_CTL_SCRIPT_LOCALTION = os.path.join('/', 'usr', 'bin')
 
 ETC_SONIC_PATH = os.path.join('/', 'etc', 'sonic')
