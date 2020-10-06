@@ -12,19 +12,10 @@ SONIC_DB_CLI="sonic-db-cli"
 TMPDIR="/tmp/"
 DEBUGLOG="${TMPDIR}/${SERVICE}.log"
 LOCKFILE="${TMPDIR}/$SERVICE-$PEER.lock"
+[[ ! -z $PEER ]] && LOCKFILE="${TMPDIR}/${SERVICE}-${PEER}.lock"
 [[ ! -z $DEV ]] && DEBUGLOG="${TMPDIR}/${SERVICE}-${DEV}.log"
-[[ ! -z $PEER ]] && LOCKFILE="${TMPDIR}/${SERVICE}-${PEER}.log"
-[[ ! -z $DEV ]] && NET_NS="$NAMESPACE_PREFIX$DEV"  # name of the network namespace
+[[ ! -z $DEV ]] && NET_NS="${NAMESPACE_PREFIX}${DEV}"  # name of the network namespace
 [[ ! -z $DEV ]] && SONIC_DB_CLI="${SONIC_DB_CLI} -n ${NET_NS}"
-
-if [ "$DEV" ]; then
-    NET_NS="$NAMESPACE_PREFIX$DEV" #name of the network namespace
-    SONIC_DB_CLI="sonic-db-cli -n $NET_NS"
-else
-    NET_NS=""
-    SONIC_DB_CLI="sonic-db-cli"
-fi
-
 
 if [[ -f /etc/sonic/${SERVICE}_dependent ]]; then
     DEPENDENT="$(cat /etc/sonic/${SERVICE}_dependent)"
