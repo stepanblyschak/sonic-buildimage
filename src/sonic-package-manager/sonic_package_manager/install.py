@@ -97,8 +97,9 @@ def uninstall_package(database, repository, force=False):
     get_logger().info(f'Request to uninstall {name}')
 
     check_package_is_installed(repository, force=force)
+    check_feature_is_disabled(host_db_connector, repository, force=force)
 
-    check_uninstallation(database, repository, version, force=force)
+    check_uninstallation(database, repository, force=force)
 
     feature.deregister(host_db_connector, repository)
     monit.generate_monit_conf(repository)
@@ -180,7 +181,6 @@ def check_uninstallation(database: database.RepositoryDatabase,
     Args:
         database:  Repository database.
         repo: Repository that is going to be installed.
-        version: Version to install.
     Raises:
         PackageDependencyError: Raised when the dependency is not installed
             or does not match the version pattern.
@@ -211,6 +211,13 @@ def check_package_is_installed(repository):
         raise PackageInstallationError(
             f'{repository.get_name()} is not installed.'
         )
+
+
+@skip_if_force_install_requested
+def check_feature_is_disabled(connector, repository):
+    if feature.is_feature_enabled(connector, repository):
+        raise PackageInstallationError(f'{repository.get_name()}'
+                                       f' is enabled.')
 
 
 def _build_repository_deps_dict(database):
