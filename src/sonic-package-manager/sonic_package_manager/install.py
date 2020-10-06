@@ -272,7 +272,7 @@ def _get_db_connectors() -> typing.Dict[typing.Optional[str], swsssdk.ConfigDBCo
     # so we can use 'host' as a key for host DB connector instead of None key.
     result = {'host': swsssdk.ConfigDBConnector()}
 
-    for roles, namespaces in multi_asic.get_all_namespaces():
+    for roles, namespaces in multi_asic.get_all_namespaces().items():
         for namespace in namespaces:
             result[namespace] = swsssdk.ConfigDBConnector(namespace=namespace)
 
