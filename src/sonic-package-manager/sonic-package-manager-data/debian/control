@@ -1,0 +1,11 @@
+Source: sonic-package-manager-data
+Maintainer: Stepan Blyshchak <stepanb@nvidia.com>
+Section: misc
+Priority: optional
+Standards-Version: 0.1
+Build-Depends: debhelper (>=9)
+
+Package: sonic-package-manager-data
+Architecture: all
+Depends: ${misc:Depends} bash-completion
+Description: Data files required for SONiC Package Manager
