@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import glob
-
 from setuptools import setup
 
 setup(
@@ -25,6 +23,15 @@ setup(
         'sonic-py-common',
         'swsssdk',
     ],
+    setup_requires=[
+        'pytest-runner',
+        'wheel'
+    ],
+    tests_require=[
+        'pytest',
+        'mock>=2.0.0',
+        'mockredispy>=2.9.3',
+    ],
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
     classifiers = [
         'Intended Audience :: Developers',
@@ -42,6 +49,7 @@ setup(
             'sonic-package-manager = sonic_package_manager.main:cli',
             'spm = sonic_package_manager.main:cli',
          ]
-    }
+    },
+    test_suite='setup.get_test_suite'
 )
 
