@@ -11,9 +11,6 @@ setup(
     author='Stepan Blyshchak',
     author_email='stepanb@nvidia.com',
     url='https://github.com/Azure/sonic-buildimage',
-    data_files=[
-        ('/usr/share/sonic/templates', glob.glob('templates/*')),
-    ],
     packages=[
         'sonic_package_manager',
     ],
