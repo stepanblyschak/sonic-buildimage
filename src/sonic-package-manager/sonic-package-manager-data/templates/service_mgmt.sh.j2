@@ -128,7 +128,7 @@ start() {
     /usr/bin/${SERVICE}.sh start $DEV
     debug "Started ${SERVICE}$DEV service..."
 
-{#- TODO: post-startup-action hook -#}
+{#- TODO: post-startup-action hook #}
 
     if [[ ! -z $PEER ]]; then
         # Unlock has to happen before reaching out to peer service
@@ -187,7 +187,7 @@ stop() {
         lock_service_state_change
     fi
 
-{#- TODO: pre-shutdown-action hook -#}
+{#- TODO: pre-shutdown-action hook #}
 
     # For WARM/FAST boot do not perform service stop
     if [[ x"$WARM_BOOT" != x"true" ]] && [[ x"$FAST_BOOT" != x"true" ]]; then
