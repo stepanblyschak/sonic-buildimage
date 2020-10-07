@@ -1,0 +1,9 @@
+---
+version: 1.0.0
+package:
+  sonic-version: '>=1.0.0'
+service:
+  name: database
+  asic-service: True
+  host-service: True
+

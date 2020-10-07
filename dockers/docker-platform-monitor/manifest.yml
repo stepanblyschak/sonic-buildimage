@@ -1,0 +1,11 @@
+---
+version: 1.0.0
+package:
+  depends:
+    - database >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: pmon
+  asic-service: False
+  host-service: True
+

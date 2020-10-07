@@ -1,0 +1,12 @@
+---
+version: 1.0.0
+package:
+  depends:
+    - database >=1.0.0
+    - syncd >=1.0.0
+  sonic-version: '>=1.0.0'
+service:
+  name: nat
+  asic-service: True
+  host-service: False
+

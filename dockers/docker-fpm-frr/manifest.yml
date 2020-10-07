@@ -1,0 +1,15 @@
+---
+version: 1.0.0
+package:
+  depends:
+    - database >=1.0.0
+    - syncd >=1.0.0
+  breaks:
+    - fpm-quagga
+    - fpm-gobgp
+  sonic-version: '>=1.0.0'
+service:
+  name: bgp
+  asic-service: True
+  host-service: False
+
