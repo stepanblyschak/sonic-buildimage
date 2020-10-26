@@ -6,8 +6,6 @@ import signal
 import sys
 import syslog
 
-import swsssdk
-
 from supervisor import childutils
 
 # Each line of this file should specify either one critical process or one
@@ -46,16 +44,6 @@ def get_critical_group_and_process_list():
     return critical_group_list, critical_process_list
 
 def main(argv):
-    container_name = None
-    opts, args = getopt.getopt(argv, "c:", ["container-name="])
-    for opt, arg in opts:
-        if opt in ("-c", "--container-name"):
-            container_name = arg
-
-    if not container_name:
-        syslog.syslog(syslog.LOG_ERR, "Container name not specified. Exiting...")
-        sys.exit(1)
-
     critical_group_list, critical_process_list = get_critical_group_and_process_list()
 
     while True:
@@ -73,32 +61,14 @@ def main(argv):
         if headers['eventname'] == 'PROCESS_STATE_EXITED':
             payload_headers, payload_data = childutils.eventdata(payload + '\n')
 
-            expected = int(payload_headers['expected'])
+            expected_exit = int(payload_headers['expected'])
             processname = payload_headers['processname']
             groupname = payload_headers['groupname']
 
-            # Read the status of auto-restart feature from Config_DB.
-            if container_name != 'database':
-                config_db = swsssdk.ConfigDBConnector()
-                config_db.connect()
-                features_table = config_db.get_table(FEATURE_TABLE_NAME)
-                if not features_table:
-                    syslog.syslog(syslog.LOG_ERR, "Unable to retrieve features table from Config DB. Exiting...")
-                    sys.exit(2)
+            is_critical = processname in critical_process_list or groupname in critical_group_list
 
-                if not features_table.has_key(container_name):
-                    syslog.syslog(syslog.LOG_ERR, "Unable to retrieve feature '{}'. Exiting...".format(container_name))
-                    sys.exit(3)
-
-                restart_feature = features_table[container_name].get('auto_restart')
-                if not restart_feature:
-                    syslog.syslog(syslog.LOG_ERR, "Unable to determine auto-restart feature status for '{}'. Exiting...".format(container_name))
-                    sys.exit(4)
-
-            # If container is database or auto-restart feature is enabled and at the same time
-            # a critical process exited unexpectedly, terminate supervisor
-            if ((container_name == 'database' or restart_feature == 'enabled') and expected == 0 and
-                    (processname in critical_process_list or groupname in critical_group_list)):
+            # If a critical process exited unexpectedly, terminate supervisor
+            if is_critical and not expected_exit:
                 MSG_FORMAT_STR = "Process {} exited unxepectedly. Terminating supervisor..."
                 msg = MSG_FORMAT_STR.format(payload_headers['processname'])
                 syslog.syslog(syslog.LOG_INFO, msg)
