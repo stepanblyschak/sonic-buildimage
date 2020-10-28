@@ -2,6 +2,8 @@
 FROM docker-config-engine-buster
 
 ARG docker_container_name
+ARG manifest
+
 ARG frr_user_uid
 ARG frr_user_gid
 
@@ -58,5 +60,7 @@ COPY ["critical_processes", "/etc/supervisor"]
 RUN chmod a+x /usr/bin/TSA && \
     chmod a+x /usr/bin/TSB && \
     chmod a+x /usr/bin/TSC
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/bin/docker_init.sh"]
