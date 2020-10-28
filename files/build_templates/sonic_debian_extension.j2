@@ -519,6 +519,10 @@ sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS ta
 {% endif %}
 {% endfor %}
 
+SONIC_PACKAGE_MANAGER_FOLDER="/var/lib/sonic-package-manager/"
+sudo mkdir -p $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_FOLDER
+j2 $BUILD_TEMPLATES/packages.json.j2 | sudo tee $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_FOLDER/packages.json
+
 {% if include_kubernetes == "y" %}
 ## Pull in kubernetes docker images
 echo "pulling universal k8s images ..."

@@ -1,0 +1,17 @@
+{
+{%- for image in installer_images.strip().split(' ') -%}
+{%- set imagefilepath = image.split(':')|first -%}
+{%- set imageversion = image.split(':')|last -%}
+{%- set imagefilename = imagefilepath.split('/')|last -%}
+{%- set imagename = imagefilename.split('.')|first -%}
+{%- set pkgname = imagename.replace('docker-', '').replace('-dbg', '') %}
+    "{{ pkgname }}": {
+        "repository": "{{ imagename }}",
+        "description": "SONiC {{ pkgname }} package",
+        "default-reference": "{{ imageversion }}",
+        "installed-version": "{{ imageversion }}",
+        "built-in": true,
+        "installed": true
+    }{% if not loop.last %},{% endif -%}
+{% endfor %}
+}
