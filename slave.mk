@@ -714,9 +714,14 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 			--build-arg uid=$(UID) \
 			--build-arg guid=$(GUID) \
 			--build-arg docker_container_name=$($*.gz_CONTAINER_NAME) \
-			--build-arg docker_image_version=$($*.gz_VERSION) \
 			--build-arg frr_user_uid=$(FRR_USER_UID) \
 			--build-arg frr_user_gid=$(FRR_USER_GID) \
+			--build-arg \
+				manifest='$(shell \
+					[ -f $($*.gz_PATH)/manifest.json.j2 ] && \
+					version=$($*.gz_VERSION) \
+					name=$($*.gz_CONTAINER_NAME) \
+						j2 $($*.gz_PATH)/manifest.json.j2)' \
 			--label Tag=$(SONIC_IMAGE_VERSION) \
 			-t $* $($*.gz_PATH) $(LOG)
 		docker save $* | gzip -c > $@
