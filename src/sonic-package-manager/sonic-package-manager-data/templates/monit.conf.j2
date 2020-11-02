@@ -1,0 +1,14 @@
+###############################################################################
+## Monit configuration for {{ feature }} service
+## process list:
+{%- for process in processes %}
+{%- if process.critical %}
+##  {{ process.name }}
+{%- endif %}
+{%- endfor %}
+###############################################################################
+{%- for process in processes %}
+check program {{ feature }}|{{ process.name }} with path "/usr/bin/process_checker {{ feature }} {{ process.command }}"
+    if status != 0 for 5 times within 5 cycles then alert
+
+{% endfor %}

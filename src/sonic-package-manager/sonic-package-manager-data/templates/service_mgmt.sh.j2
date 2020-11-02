@@ -1,0 +1,226 @@
+#!/bin/bash
+
+#
+# =============== Managed by SONiC Package Manager. DO NOT EDIT! ===============
+#             auto-generated from {{ source }} by sonic-package-manager
+#
+
+SERVICE="{{ name }}"
+PEER=""
+NAMESPACE_PREFIX="asic"
+SONIC_DB_CLI="sonic-db-cli"
+TMPDIR="/tmp/"
+DEBUGLOG="${TMPDIR}/${SERVICE}.log"
+LOCKFILE="${TMPDIR}/$SERVICE-$PEER.lock"
+[[ ! -z $PEER ]] && LOCKFILE="${TMPDIR}/${SERVICE}-${PEER}.lock"
+[[ ! -z $DEV ]] && DEBUGLOG="${TMPDIR}/${SERVICE}-${DEV}.log"
+[[ ! -z $DEV ]] && NET_NS="${NAMESPACE_PREFIX}${DEV}"  # name of the network namespace
+[[ ! -z $DEV ]] && SONIC_DB_CLI="${SONIC_DB_CLI} -n ${NET_NS}"
+
+if [[ -f /etc/sonic/${SERVICE}_dependent ]]; then
+    DEPENDENT="$(cat /etc/sonic/${SERVICE}_dependent)"
+fi
+
+if [[ -f /etc/sonic/${SERVICE}_multi_inst_dependent ]]; then
+    MULTI_INST_DEPENDENT="cat /etc/sonic/${SERVICE}_multi_inst_dependent"
+fi
+
+[[ ! -z $DEV ]] && DEBUGLOG="/tmp/${SERVICE}_$DEV.log" || DEBUGLOG="/tmp/${SERVICE}.log"
+[[ ! -z $PEER ]] && LOCKFILE="/tmp/$SERVICE-$PEER-lock$DEV"
+
+function debug()
+{
+    /usr/bin/logger $1
+    /bin/echo `date` "- $1" >> ${DEBUGLOG}
+}
+
+function lock_service_state_change()
+{
+    debug "Locking ${LOCKFILE} from ${SERVICE}$DEV service"
+
+    exec {LOCKFD}>${LOCKFILE}
+    /usr/bin/flock -x ${LOCKFD}
+    trap "/usr/bin/flock -u ${LOCKFD}" 0 2 3 15
+
+    debug "Locked ${LOCKFILE} (${LOCKFD}) from ${SERVICE}$DEV service"
+}
+
+function unlock_service_state_change()
+{
+    debug "Unlocking ${LOCKFILE} (${LOCKFD}) from ${SERVICE}$DEV service"
+    /usr/bin/flock -u ${LOCKFD}
+}
+
+function check_warm_boot()
+{
+    SYSTEM_WARM_START=`$SONIC_DB_CLI STATE_DB hget "WARM_RESTART_ENABLE_TABLE|system" enable`
+    SERVICE_WARM_START=`$SONIC_DB_CLI STATE_DB hget "WARM_RESTART_ENABLE_TABLE|${SERVICE}" enable`
+    if [[ x"$SYSTEM_WARM_START" == x"true" ]] || [[ x"$SERVICE_WARM_START" == x"true" ]]; then
+        WARM_BOOT="true"
+{#- TODO: restore count validation for SONiC packages #}
+    else
+        WARM_BOOT="false"
+    fi
+}
+
+function check_fast_boot()
+{
+    if [[ $($SONIC_DB_CLI STATE_DB GET "FAST_REBOOT|system") == "1" ]]; then
+        FAST_BOOT="true"
+    else
+        FAST_BOOT="false"
+    fi
+}
+
+function start_peer_and_dependent_services() {
+    if [[ x"$WARM_BOOT" != x"true" ]]; then
+        if [[ ! -z $PEER ]]; then
+            if [[ ! -z $DEV ]]; then
+                /bin/systemctl start ${PEER}@$DEV
+            else
+                /bin/systemctl start ${PEER}
+            fi
+        fi
+        for dep in ${DEPENDENT}; do
+            /bin/systemctl start ${dep}
+        done
+        for dep in ${MULTI_INST_DEPENDENT}; do
+            if [[ ! -z $DEV ]]; then
+                /bin/systemctl start ${dep}@$DEV
+            else
+                /bin/systemctl start ${dep}
+            fi
+        done
+    fi
+}
+
+function stop_peer_and_dependent_services() {
+    # if warm/fast start enabled or peer lock exists, don't stop peer service docker
+    if [[ x"$WARM_BOOT" != x"true" ]] && [[ x"$FAST_BOOT" != x"true" ]]; then
+        if [[ ! -z $PEER ]]; then
+            if [[ ! -z $DEV ]]; then
+                /bin/systemctl stop ${PEER}@$DEV
+            else
+                /bin/systemctl stop ${PEER}
+            fi
+        fi
+        for dep in ${DEPENDENT}; do
+            /bin/systemctl stop ${dep}
+        done
+        for dep in ${MULTI_INST_DEPENDENT}; do
+            if [[ ! -z $DEV ]]; then
+                /bin/systemctl stop ${dep}@$DEV
+            else
+                /bin/systemctl stop ${dep}
+            fi
+        done
+    fi
+}
+
+function start() {
+    debug "Starting ${SERVICE}$DEV service..."
+
+    if [[ ! -z $PEER ]]; then
+        lock_service_state_change
+    fi
+
+    # start service docker
+    /usr/bin/${SERVICE}.sh start $DEV
+    debug "Started ${SERVICE}$DEV service..."
+
+{#- TODO: post-startup-action hook #}
+
+    if [[ ! -z $PEER ]]; then
+        # Unlock has to happen before reaching out to peer service
+        unlock_service_state_change
+    fi
+}
+
+function wait() {
+    start_peer_and_dependent_services
+
+    # Allow some time for peer container to start
+    # NOTE: This assumes Docker containers share the same names as their
+    # corresponding services
+    if [[ ! -z $PEER ]]; then
+        for SECS in {1..60}; do
+            if [[ ! -z $DEV ]]; then
+{%- raw %}
+                RUNNING=$(docker inspect -f '{{.State.Running}}' ${PEER}$DEV)
+{%- endraw %}
+            else
+{%- raw %}
+                RUNNING=$(docker inspect -f '{{.State.Running}}' ${PEER})
+{%- endraw %}
+            fi
+            if [[ x"$RUNNING" == x"true" ]]; then
+                break
+            else
+                sleep 1
+            fi
+        done
+    fi
+
+    if [[ ! -z $PEER ]]; then
+        # NOTE: This assumes Docker containers share the same names as their
+        # corresponding services
+        if [[ ! -z $DEV ]]; then
+            /usr/bin/docker-wait-any ${SERVICE}$DEV ${PEER}$DEV
+        else
+            /usr/bin/docker-wait-any ${SERVICE} ${PEER}
+        fi
+    else
+        if [[ ! -z $DEV ]]; then
+            /usr/bin/${SERVICE}.sh wait $DEV
+        else
+            /usr/bin/${SERVICE}.sh wait
+        fi
+    fi
+}
+
+function stop() {
+    debug "Stopping ${SERVICE}$DEV service..."
+
+    [[ -f ${LOCKFILE} ]] || /usr/bin/touch ${LOCKFILE}
+
+    if [[ ! -z $PEER ]]; then
+        lock_service_state_change
+    fi
+
+{#- TODO: pre-shutdown-action hook #}
+
+    # For WARM/FAST boot do not perform service stop
+    if [[ x"$WARM_BOOT" != x"true" ]] && [[ x"$FAST_BOOT" != x"true" ]]; then
+        /usr/bin/${SERVICE}.sh stop $DEV
+    else
+        docker kill ${SERVICE}$DEV &> /dev/null debug "Docker ${SERVICE}$DEV is not running ($?) ..."
+    fi
+
+    debug "Stopped ${SERVICE}$DEV service..."
+
+    if [[ ! -z $PEER ]]; then
+        # Unlock has to happen before reaching out to peer service
+        unlock_service_state_change
+    fi
+
+    stop_peer_and_dependent_services
+}
+
+OP=$1
+DEV=$2
+
+check_warm_boot
+check_fast_boot
+
+debug "Fast boot flag: ${SERVICE}$DEV ${FAST_BOOT}."
+debug "Warm boot flag: ${SERVICE}$DEV ${WARM_BOOT}."
+
+case "$OP" in
+    start|wait|stop)
+        $1
+        ;;
+    *)
+        echo "Usage: $0 {start|wait|stop}"
+        exit 1
+        ;;
+esac
