@@ -2,6 +2,8 @@
 FROM docker-config-engine-buster
 
 ARG docker_container_name
+ARG manifest
+
 RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%syslogtag%/;" /etc/rsyslog.conf
 
 # Make apt-get non-interactive
@@ -72,5 +74,7 @@ COPY ["docker-pmon.supervisord.conf.j2", "/usr/share/sonic/templates/"]
 COPY ["ssd_tools/*", "/usr/bin/"]
 COPY ["files/supervisor-proc-exit-listener", "/usr/bin"]
 COPY ["critical_processes", "/etc/supervisor"]
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/bin/docker_init.sh"]

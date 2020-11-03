@@ -1,0 +1,14 @@
+{
+    "version": "1.0.0",
+    "package": {
+        "version": "{{ version }}",
+        "base-os-contraint": "^1.0.0",
+        "depends": ["database^1.0.0", "swss^1.0.0"],
+        "conflicts": ["fpm-gobgp", "fpm-frr"]
+    },
+    "service": {
+        "name": "{{ name }}",
+        "asic-service": true,
+        "host-service": false
+    }
+}

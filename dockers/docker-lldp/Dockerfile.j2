@@ -2,6 +2,8 @@
 FROM docker-config-engine-buster
 
 ARG docker_container_name
+ARG manifest
+
 RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%syslogtag%/;" /etc/rsyslog.conf
 
 # Make apt-get non-interactive
@@ -43,5 +45,7 @@ COPY ["lldpd", "/etc/default/"]
 COPY ["lldpmgrd", "/usr/bin/"]
 COPY ["files/supervisor-proc-exit-listener", "/usr/bin"]
 COPY ["critical_processes", "/etc/supervisor"]
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/bin/docker-lldp-init.sh"]
