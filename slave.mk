@@ -734,6 +734,7 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 					[ -f $($*.gz_PATH)/manifest.json.j2 ] && \
 					version=$($*.gz_VERSION) \
 					name=$($*.gz_CONTAINER_NAME) \
+					package_name=$($*.gz_PACKAGE_NAME) \
 						j2 $($*.gz_PATH)/manifest.json.j2)' \
 			--label Tag=$(SONIC_IMAGE_VERSION) \
 			-t $* $($*.gz_PATH) $(LOG)

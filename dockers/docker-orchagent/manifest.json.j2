@@ -3,7 +3,11 @@
     "package": {
         "version": "{{ version }}",
         "base-os-contraint": "^1.0.0",
-        "depends": ["database^1.0.0", "syncd^1.0.0"]
+        "depends": [
+            "database^1.0.0",
+            "syncd^1.0.0"
+        ],
+        "name": "{{ package_name }}"
     },
     "service": {
         "name": "{{ name }}",
