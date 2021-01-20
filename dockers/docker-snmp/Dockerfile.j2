@@ -2,7 +2,9 @@
 FROM docker-config-engine-buster
 
 ARG docker_container_name
+ARG manifest
 ARG image_version
+
 RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%syslogtag%/;" /etc/rsyslog.conf
 
 # Enable -O for all Python calls
@@ -76,5 +78,7 @@ COPY ["critical_processes", "/etc/supervisor"]
 
 # Although exposing ports is not needed for host net mode, keep it for possible bridge mode
 EXPOSE 161/udp 162/udp
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/local/bin/supervisord"]

@@ -1,6 +1,8 @@
 FROM docker-config-engine
 
 ARG docker_container_name
+ARG manifest
+
 RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%syslogtag%/;" /etc/rsyslog.conf
 
 ## Make apt-get non-interactive
@@ -31,5 +33,7 @@ COPY ["profile.ini", "/etc/ssw/AS7512/"]
 ## Clean up
 RUN apt-get clean -y; apt-get autoclean -y; apt-get autoremove -y
 RUN rm -rf /debs
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/local/bin/supervisord"]
