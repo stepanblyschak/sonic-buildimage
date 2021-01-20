@@ -9,6 +9,8 @@ SONIC_STRETCH_DOCKERS += $(DOCKER_SAISERVER_MRVL)
 
 $(DOCKER_SAISERVER_MRVL)_CONTAINER_NAME = saiserver
 $(DOCKER_SAISERVER_MRVL)_RUN_OPT += --net=host --privileged -t
+$(DOCKER_SAISERVER_MRVL)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_SAISERVER_MRVL)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_SAISERVER_MRVL)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SAISERVER_MRVL)_RUN_OPT += -v /var/run/docker-saiserver:/var/run/sswsyncd
 $(DOCKER_SAISERVER_MRVL)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro

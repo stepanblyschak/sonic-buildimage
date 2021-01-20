@@ -28,6 +28,8 @@ endif
 
 $(DOCKER_NAT)_CONTAINER_NAME = nat
 $(DOCKER_NAT)_RUN_OPT += --privileged -t
+$(DOCKER_NAT)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_NAT)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_NAT)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_NAT)_RUN_OPT += -v /host/warmboot:/var/warmboot
 

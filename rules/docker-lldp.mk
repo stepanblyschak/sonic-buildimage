@@ -27,6 +27,8 @@ SONIC_INSTALL_DOCKER_DBG_IMAGES += $(DOCKER_LLDP_DBG)
 
 $(DOCKER_LLDP)_CONTAINER_NAME = lldp
 $(DOCKER_LLDP)_RUN_OPT += --privileged -t
+$(DOCKER_LLDP)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_LLDP)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_LLDP)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_LLDP)_RUN_OPT += -v /usr/share/sonic/scripts:/usr/share/sonic/scripts:ro
 

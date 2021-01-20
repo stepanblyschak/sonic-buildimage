@@ -339,9 +339,6 @@ start() {
         fi
     fi
 {%- endif %}
-{%- if sonic_asic_platform == "mellanox" %}
-    # TODO: Mellanox will remove the --tmpfs exception after SDK socket path changed in new SDK version
-{%- endif %}
     docker create {{docker_image_run_opt}} \
         --net=$NET \
         -e RUNTIME_OWNER=local \
@@ -359,14 +356,6 @@ start() {
         -v mlnx_sdk_ready:/tmp \
         -v /dev/shm:/dev/shm:rw \
         -e SX_API_SOCKET_FILE=/var/run/sx_sdk/sx_api.sock \
-{%- elif docker_container_name == "pmon" %}
-        -v /var/run/hw-management:/var/run/hw-management:rw \
-        -v mlnx_sdk_socket:/var/run/sx_sdk \
-        -v mlnx_sdk_ready:/tmp \
-        -e SX_API_SOCKET_FILE=/var/run/sx_sdk/sx_api.sock \
-        -v /dev/shm:/dev/shm:rw \
-{%- else %}
-        --tmpfs /tmp \
 {%- endif %}
 {%- endif %}
 {%- if sonic_asic_platform == "broadcom" %}
@@ -389,10 +378,6 @@ start() {
 {%- endif %}
         $REDIS_MNT \
         -v /usr/share/sonic/device/$PLATFORM:/usr/share/sonic/platform:ro \
-{%- if sonic_asic_platform != "mellanox" %}
-        --tmpfs /tmp \
-{%- endif %}
-        --tmpfs /var/tmp \
         --env "NAMESPACE_ID"="$DEV" \
         --env "NAMESPACE_PREFIX"="$NAMESPACE_PREFIX" \
         --env "NAMESPACE_COUNT"=$NUM_ASIC \

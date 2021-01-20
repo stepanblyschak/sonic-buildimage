@@ -20,5 +20,7 @@ $(DOCKER_SYNCD_CAVM_RPC)_CONTAINER_NAME = syncd
 $(DOCKER_SYNCD_CAVM_RPC)_VERSION = 1.0.0
 $(DOCKER_SYNCD_CAVM_RPC)_PACKAGE_NAME = syncd
 $(DOCKER_SYNCD_CAVM_RPC)_RUN_OPT += --net=host --privileged -t
+$(DOCKER_SYNCD_CAVM_RPC)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_SYNCD_CAVM_RPC)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_SYNCD_CAVM_RPC)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SYNCD_CAVM_RPC)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro

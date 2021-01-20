@@ -21,6 +21,8 @@ endif
 
 $(DOCKER_RESTAPI)_CONTAINER_NAME = restapi
 $(DOCKER_RESTAPI)_RUN_OPT += --cap-add NET_ADMIN --privileged -t
+$(DOCKER_RESTAPI)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_RESTAPI)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_RESTAPI)_RUN_OPT += -v /var/run/redis/redis.sock:/var/run/redis/redis.sock
 $(DOCKER_RESTAPI)_RUN_OPT += -v /etc/sonic/credentials:/etc/sonic/credentials:ro
 $(DOCKER_RESTAPI)_RUN_OPT += -p=8081:8081/tcp

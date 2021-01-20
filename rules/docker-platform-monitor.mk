@@ -54,6 +54,17 @@ SONIC_INSTALL_DOCKER_DBG_IMAGES += $(DOCKER_PLATFORM_MONITOR_DBG)
 
 $(DOCKER_PLATFORM_MONITOR)_CONTAINER_NAME = pmon
 $(DOCKER_PLATFORM_MONITOR)_RUN_OPT += --privileged -t
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += --tmpfs /var/tmp
+ifneq ($(CONFIGURED_PLATFORM),mellanox)
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += --tmpfs /tmp
+else
+# Custom pmon run options required for communication with SDK process
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v /var/run/hw-management:/var/run/hw-management:rw
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v mlnx_sdk_socket:/var/run/sx_sdk
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v mlnx_sdk_ready:/tmp
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -e SX_API_SOCKET_FILE=/var/run/sx_sdk/sx_api.sock
+$(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v /dev/shm:/dev/shm:rw
+endif
 $(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v /usr/share/sonic/scripts:/usr/share/sonic/scripts:ro
 $(DOCKER_PLATFORM_MONITOR)_RUN_OPT += -v /var/run/platform_cache:/var/run/platform_cache:ro

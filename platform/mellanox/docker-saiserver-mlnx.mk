@@ -10,6 +10,11 @@ SONIC_STRETCH_DOCKERS += $(DOCKER_SAISERVER_MLNX)
 
 $(DOCKER_SAISERVER_MLNX)_CONTAINER_NAME = saiserver
 $(DOCKER_SAISERVER_MLNX)_RUN_OPT += --net=host --privileged -t
+$(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v /var/log/mellanox/sniffer:/var/log/mellanox/sniffer:rw
+$(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v mlnx_sdk_socket:/var/run/sx_sdk
+$(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v mlnx_sdk_ready:/tmp
+$(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v /dev/shm:/dev/shm:rw
+$(DOCKER_SAISERVER_MLNX)_RUN_OPT += -e SX_API_SOCKET_FILE=/var/run/sx_sdk/sx_api.sock
 $(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SAISERVER_MLNX)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_SYNCD_BASE)_RUN_OPT += --tmpfs /run/criu

@@ -26,6 +26,8 @@ SONIC_INSTALL_DOCKER_DBG_IMAGES += $(DOCKER_DHCP_RELAY_DBG)
 
 $(DOCKER_DHCP_RELAY)_CONTAINER_NAME = dhcp_relay
 $(DOCKER_DHCP_RELAY)_RUN_OPT += --privileged -t
+$(DOCKER_DHCP_RELAY)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_DHCP_RELAY)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_DHCP_RELAY)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_DHCP_RELAY)_RUN_OPT += -v /usr/share/sonic/scripts:/usr/share/sonic/scripts:ro
 $(DOCKER_DHCP_RELAY)_FILES += $(SUPERVISOR_PROC_EXIT_LISTENER_SCRIPT)

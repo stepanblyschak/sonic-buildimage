@@ -28,6 +28,8 @@ endif
 
 $(DOCKER_SFLOW)_CONTAINER_NAME = sflow
 $(DOCKER_SFLOW)_RUN_OPT += --privileged -t
+$(DOCKER_SFLOW)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_SFLOW)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_SFLOW)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_SFLOW)_RUN_OPT += -v /host/warmboot:/var/warmboot
 

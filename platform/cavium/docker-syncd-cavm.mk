@@ -21,6 +21,8 @@ $(DOCKER_SYNCD_BASE)_PACKAGE_NAME = syncd
 
 $(DOCKER_SYNCD_CAVM)_CONTAINER_NAME = syncd
 $(DOCKER_SYNCD_CAVM)_RUN_OPT += --net=host --privileged -t
+$(DOCKER_SYNCD_CAVM)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_SYNCD_CAVM)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_SYNCD_CAVM)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SYNCD_CAVM)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
 $(DOCKER_SYNCD_CAVM)_BASE_IMAGE_FILES += monit_syncd:/etc/monit/conf.d

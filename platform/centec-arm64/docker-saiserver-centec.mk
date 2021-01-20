@@ -9,6 +9,8 @@ SONIC_DOCKER_IMAGES += $(DOCKER_SAISERVER_CENTEC)
 
 $(DOCKER_SAISERVER_CENTEC)_CONTAINER_NAME = saiserver
 $(DOCKER_SAISERVER_CENTEC)_RUN_OPT += --privileged -t
+$(DOCKER_SAISERVER_CENTEC)_RUN_OPT += --tmpfs /tmp
+$(DOCKER_SAISERVER_CENTEC)_RUN_OPT += --tmpfs /var/tmp
 $(DOCKER_SAISERVER_CENTEC)_RUN_OPT += -v /host/machine.conf:/etc/machine.conf
 $(DOCKER_SAISERVER_CENTEC)_RUN_OPT += -v /var/run/docker-saiserver:/var/run/sswsyncd
 $(DOCKER_SAISERVER_CENTEC)_RUN_OPT += -v /etc/sonic:/etc/sonic:ro
