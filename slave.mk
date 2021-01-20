@@ -905,7 +905,7 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
 	export enable_pfcwd_on_start="$(ENABLE_PFCWD_ON_START)"
 	export installer_debs="$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$($*_INSTALLS))"
 	export lazy_installer_debs="$(foreach deb, $($*_LAZY_INSTALLS),$(foreach device, $($(deb)_PLATFORM),$(addprefix $(device)@, $(IMAGE_DISTRO_DEBS_PATH)/$(deb))))"
-	export installer_images="$(addprefix $(TARGET_PATH)/,$($*_DOCKERS))"
+	export installer_images="$(foreach docker, $($*_DOCKERS),$(addprefix $(TARGET_PATH)/,$(addsuffix :$($(docker)_VERSION),$(docker))))"
 	export sonic_py_common_py2_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY2))"
 	export sonic_py_common_py3_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY3))"
 	export config_engine_py2_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_CONFIG_ENGINE_PY2))"
