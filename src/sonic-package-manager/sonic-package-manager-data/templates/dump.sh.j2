@@ -1,0 +1,12 @@
+#!/bin/bash
+
+#
+# =============== Managed by SONiC Package Manager. DO NOT EDIT! ===============
+#             auto-generated from {{ source }} by sonic-package-manager
+#
+
+# TODO: Multi-ASIC services support
+
+DEV="$1"
+
+docker exec -t {{ manifest.service.name }}$DEV {{ manifest.package['debug-dump'] }}

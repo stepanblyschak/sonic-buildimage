@@ -861,6 +861,7 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
                 $(PYTHON_SWSSCOMMON) \
                 $(PYTHON3_SWSSCOMMON) \
                 $(SONIC_UTILITIES_DATA) \
+                $(SONIC_PACKAGE_MANAGER_DATA) \
                 $(SONIC_HOST_SERVICES_DATA)) \
         $$(addprefix $(TARGET_PATH)/,$$($$*_DOCKERS)) \
         $$(addprefix $(FILES_PATH)/,$$($$*_FILES)) \
@@ -882,7 +883,8 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
         $(addprefix $(FILES_PATH)/,$($(SONIC_CTRMGRD)_FILES)) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_YANG_MGMT_PY3)) \
         $(addprefix $(PYTHON_WHEELS_PATH)/,$(SYSTEM_HEALTH)) \
-        $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_HOST_SERVICES_PY3))
+        $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_HOST_SERVICES_PY3)) \
+        $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PACKAGE_MANAGER_PY3))
 	$(HEADER)
 	# Pass initramfs and linux kernel explicitly. They are used for all platforms
 	export debs_path="$(IMAGE_DISTRO_DEBS_PATH)"
@@ -934,6 +936,7 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
 	export python_swss_debs="$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$($(LIBSWSSCOMMON)_RDEPENDS))"
 	export python_swss_debs+=" $(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(LIBSWSSCOMMON)) $(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(PYTHON_SWSSCOMMON)) $(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(PYTHON3_SWSSCOMMON))"
 	export sonic_utilities_py3_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_UTILITIES_PY3))"
+	export sonic_package_manager_py3_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PACKAGE_MANAGER_PY3))"
 	export sonic_host_services_py3_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_HOST_SERVICES_PY3))"
 
 	$(foreach docker, $($*_DOCKERS),\

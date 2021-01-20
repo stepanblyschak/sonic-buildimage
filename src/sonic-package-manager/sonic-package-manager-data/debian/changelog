@@ -1,0 +1,5 @@
+sonic-package-manager-data (1.0-1) UNRELEASED; urgency=low
+
+  * Initial release
+
+ -- Stepan Blyshchak <stepanb@nvidia.com>  Thu, 1 Oct 2020 00:30:00 +0000
