@@ -31,10 +31,12 @@ BUILD_SCRIPTS_DIR=files/build_scripts
 BUILD_TEMPLATES=files/build_templates
 IMAGE_CONFIGS=files/image_config
 SCRIPTS_DIR=files/scripts
+DOCKER_SCRIPTS_DIR=files/docker
 
 # Define target fold macro
 FILESYSTEM_ROOT_USR="$FILESYSTEM_ROOT/usr"
-FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM="$FILESYSTEM_ROOT/usr/lib/systemd/system"
+FILESYSTEM_ROOT_USR_LIB="$FILESYSTEM_ROOT/usr/lib/"
+FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM="$FILESYSTEM_ROOT_USR_LIB/systemd/system"
 FILESYSTEM_ROOT_USR_SHARE="$FILESYSTEM_ROOT_USR/share"
 FILESYSTEM_ROOT_USR_SHARE_SONIC="$FILESYSTEM_ROOT_USR_SHARE/sonic"
 FILESYSTEM_ROOT_USR_SHARE_SONIC_SCRIPTS="$FILESYSTEM_ROOT_USR_SHARE_SONIC/scripts"
@@ -589,6 +591,10 @@ sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS ta
 sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS tag {{imagename}}:latest {{imagebasename}}:latest
 {% endif %}
 {% endfor %}
+
+# Copy docker start script to be able to start docker in chroot
+sudo mkdir -p $FILESYSTEM_ROOT_USR_LIB/docker
+sudo cp $DOCKER_SCRIPTS_DIR/docker $FILESYSTEM_ROOT_USR_LIB/docker/docker.sh
 
 {% if include_kubernetes == "y" %}
 ## Pull in kubernetes docker images
