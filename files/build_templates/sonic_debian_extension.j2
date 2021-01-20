@@ -395,7 +395,7 @@ sudo https_proxy=$https_proxy LANG=C chroot $FILESYSTEM_ROOT pip3 install watchd
 
 {% if include_kubernetes == "y" %}
 # Install remote Container mgmt package
-# Required even if include_kubernetes != y, as it contains the 
+# Required even if include_kubernetes != y, as it contains the
 # the container wrapper for docker start/stop/wait commands.
 #
 SONIC_CTRMGMT_WHEEL_NAME=$(basename {{sonic_ctrmgmt_py3_wheel_path}})
@@ -419,7 +419,7 @@ sudo LANG=C chroot $FILESYSTEM_ROOT systemctl enable ctrmgrd.service
 # kubelet service is controlled by ctrmgrd daemon.
 sudo LANG=C chroot $FILESYSTEM_ROOT systemctl disable kubelet.service
 {% else %}
-# container script for docker commands, which is required as 
+# container script for docker commands, which is required as
 # all docker commands are replaced with container commands.
 # So just copy that file only.
 #
@@ -595,6 +595,9 @@ sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS ta
 # Copy docker start script to be able to start docker in chroot
 sudo mkdir -p $FILESYSTEM_ROOT_USR_LIB/docker
 sudo cp $DOCKER_SCRIPTS_DIR/docker $FILESYSTEM_ROOT_USR_LIB/docker/docker.sh
+
+# Copy docker_image_ctl.j2 for SONiC Package Manager
+sudo cp $BUILD_TEMPLATES/docker_image_ctl.j2 $FILESYSTEM_ROOT_USR_SHARE_SONIC_TEMPLATES/docker_image_ctl.j2
 
 {% if include_kubernetes == "y" %}
 ## Pull in kubernetes docker images
