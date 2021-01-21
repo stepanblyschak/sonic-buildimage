@@ -591,6 +591,7 @@ sudo mkdir $FILESYSTEM_ROOT/target
 sudo mount --bind target $FILESYSTEM_ROOT/target
 sudo chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS info
 
+
 {% for docker_installation_target in installer_images.strip().split() -%}
 {% set pkgname, docker_build_path, image = docker_installation_target.split('|') %}
 {% set imagefilepath = image.split(':')|first -%}
