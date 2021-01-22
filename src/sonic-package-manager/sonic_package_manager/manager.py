@@ -7,7 +7,7 @@ import tempfile
 from typing import Dict, Any, Iterable, Optional, Callable
 
 import docker
-import filelock as filelock
+import filelock
 from sonic_py_common import device_info
 
 from sonic_package_manager import utils
@@ -238,8 +238,7 @@ class PackageManager:
             raise
 
         package.entry.installed = True
-        # When installing package from a tarball, package
-        # may not be in database.
+        # When installing package from a tarball, package may not be in database.
         if not self.database.has_package(package.name):
             self.database.add_package(package.name, package.repository)
         self.database.update_package(package.entry)
@@ -455,8 +454,7 @@ class PackageManager:
             if dockerd_sock:
                 log.info(f'{log_msg_operation} {package_entry.name} from old docker library')
                 dockerapi = DockerApi(docker.DockerClient(base_url=f'unix://{dockerd_sock}'))
-                repotag = f'{package_entry.repository}:latest'
-                image = dockerapi.get_image(repotag)
+                image = dockerapi.get_image(f'{package_entry.repository}:latest')
                 with tempfile.NamedTemporaryFile('wb') as file:
                     for chunk in image.save(named=True):
                         file.write(chunk)
