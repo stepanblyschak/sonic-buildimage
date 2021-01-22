@@ -252,6 +252,7 @@ $(info "INCLUDE_HOST_SERVICE"            : "$(INCLUDE_HOST_SERVICE)")
 $(info "INCLUDE_RESTAPI"                 : "$(INCLUDE_RESTAPI)")
 $(info "INCLUDE_SFLOW"                   : "$(INCLUDE_SFLOW)")
 $(info "INCLUDE_NAT"                     : "$(INCLUDE_NAT)")
+$(info "INCLUDE_DHCP_RELAY"              : "$(INCLUDE_DHCP_RELAY)")
 $(info "INCLUDE_KUBERNETES"              : "$(INCLUDE_KUBERNETES)")
 $(info "TELEMETRY_WRITABLE"              : "$(TELEMETRY_WRITABLE)")
 $(info "PDDF_SUPPORT"                    : "$(PDDF_SUPPORT)")
@@ -864,6 +865,7 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
                 $(SONIC_PACKAGE_MANAGER_DATA) \
                 $(SONIC_HOST_SERVICES_DATA)) \
         $$(addprefix $(TARGET_PATH)/,$$($$*_DOCKERS)) \
+        $$(addprefix $(TARGET_PATH)/,$$(SONIC_PACKAGES_LOCAL)) \
         $$(addprefix $(FILES_PATH)/,$$($$*_FILES)) \
         $(if $(findstring y,$(ENABLE_ZTP)),$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(SONIC_ZTP))) \
         $(if $(findstring y,$(INCLUDE_HOST_SERVICE)),$(addprefix $(IMAGE_DISTRO_DEBS_PATH)/,$(SONIC_HOST_SERVICE))) \
@@ -916,8 +918,17 @@ $(addprefix $(TARGET_PATH)/, $(SONIC_INSTALLERS)) : $(TARGET_PATH)/% : \
 	export lazy_installer_debs="$(foreach deb, $($*_LAZY_INSTALLS),$(foreach device, $($(deb)_PLATFORM),$(addprefix $(device)@, $(IMAGE_DISTRO_DEBS_PATH)/$(deb))))"
 	export installer_images="$(foreach docker, $($*_DOCKERS),\
 				$(addprefix $($(docker)_PACKAGE_NAME)|,\
-					$(addprefix $($(docker)_PATH)|,\
-						$(addprefix $(TARGET_PATH)/,$(addsuffix :$($(docker)_VERSION),$(docker))))))"
+				$(addprefix $($(docker)_PATH)|,\
+				$(addprefix $(TARGET_PATH)/,$(addsuffix :$($(docker)_VERSION),$(docker))))))"
+	export sonic_packages="$(foreach package, $(SONIC_PACKAGES),\
+				$(addsuffix |$($(package)_DEFAULT_FEATURE_STATE_ENABLED),\
+				$(addsuffix |$($(package)_DEFAULT_FEATURE_OWNER),\
+				$(addsuffix |$($(package)_VERSION),\
+				$(addsuffix |$($(package)_REPOSITORY), $(package))))))"
+	export sonic_local_packages="$(foreach package, $(SONIC_PACKAGES_LOCAL),\
+				$(addsuffix |$($(package)_DEFAULT_FEATURE_STATE_ENABLED),\
+				$(addsuffix |$($(package)_DEFAULT_FEATURE_OWNER),\
+				$(addsuffix |$(addprefix $(TARGET_PATH)/, $(package)), $(package)))))"
 	export sonic_py_common_py2_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY2))"
 	export sonic_py_common_py3_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_PY_COMMON_PY3))"
 	export config_engine_py2_wheel_path="$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_CONFIG_ENGINE_PY2))"

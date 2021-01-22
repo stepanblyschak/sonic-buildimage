@@ -625,6 +625,28 @@ sudo https_proxy=$https_proxy LANG=C chroot $FILESYSTEM_ROOT docker pull k8s.gcr
 echo "docker images pull complete"
 {% endif %}
 
+{% macro get_install_options(default_owner, enabled) -%}
+{% set args = ["-y", "-v", "DEBUG"] -%}
+{% if default_owner -%}
+{% set args = args + ["--default-owner", default_owner] -%}
+{% endif -%}
+{% if enabled == "y" -%}
+{% set args = args + ["--enable"] -%}
+{% endif -%}
+{{ args | join(' ') }}
+{% endmacro -%}
+
+{% for package in sonic_packages.strip().split() -%}
+{% set name, repo, version, default_owner, enabled = package.split('|') -%}
+sudo LANG=C chroot $FILESYSTEM_ROOT sonic-package-manager repository add {{ name }} {{ repo }}
+sudo LANG=C chroot $FILESYSTEM_ROOT sonic-package-manager install {{ name }}=={{ version }} {{ get_install_options(default_owner, enabled) }}
+{% endfor -%}
+
+{% for package in sonic_local_packages.strip().split() -%}
+{% set name, path, default_owner, enabled = package.split('|') -%}
+sudo LANG=C chroot $FILESYSTEM_ROOT sonic-package-manager install {{ path }} {{ get_install_options(default_owner, enabled) }}
+{% endfor -%}
+
 sudo umount $FILESYSTEM_ROOT/target
 sudo rm -r $FILESYSTEM_ROOT/target
 if [[ $CONFIGURED_ARCH == armhf || $CONFIGURED_ARCH == arm64 ]]; then
