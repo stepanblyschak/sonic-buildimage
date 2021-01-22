@@ -2,13 +2,16 @@
 
 """ Repository Database interface module. """
 import json
+import os
 from dataclasses import dataclass, replace
 from typing import Optional, Dict, Callable
 
 from sonic_package_manager.errors import PackageManagerError, PackageNotFoundError, PackageAlreadyExistsError
 from sonic_package_manager.version import Version
 
-DB_FILE_PATH = '/var/lib/sonic-package-manager/packages.json'
+BASE_LIBRARY_PATH = '/var/lib/sonic-package-manager/'
+PACKAGE_MANAGER_DB_FILE_PATH = os.path.join(BASE_LIBRARY_PATH, 'packages.json')
+PACKAGE_MANAGER_LOCK_FILE = os.path.join(BASE_LIBRARY_PATH, '.lock')
 
 
 @dataclass(order=True)
@@ -176,7 +179,7 @@ class PackageDatabase:
             yield self.get_package(name)
 
     @staticmethod
-    def from_file(db_file=DB_FILE_PATH) -> 'PackageDatabase':
+    def from_file(db_file=PACKAGE_MANAGER_DB_FILE_PATH) -> 'PackageDatabase':
         """ Read database content from file. """
 
         def on_save(database):

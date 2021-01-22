@@ -1,6 +1,7 @@
 #!/usr/bin/env python
+from abc import ABC
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, Callable
+from typing import Optional, List, Dict, Any
 
 from sonic_package_manager.constraint import PackageConstraint, VersionConstraint
 from sonic_package_manager.errors import ManifestError
@@ -12,16 +13,8 @@ class ManifestSchema:
     and unmarshalling methods.
     """
 
-    @dataclass
-    class ManifestNode:
-        """
-        Base class for any manifest object.
-
-        Attrs:
-            key: String representing the key for this object.
-        """
-
-        key: str
+    class Marshaller:
+        """ Base class for marshaling and un-marshaling. """
 
         def marshal(self, value):
             """ Validates and returns a valid manifest dictionary.
@@ -42,6 +35,50 @@ class ManifestSchema:
             """
 
             raise NotImplementedError
+
+    @dataclass
+    class ParsedMarshaller(Marshaller):
+        """ Marshaller used on types which support class method "parse" """
+
+        type: Any
+
+        def marshal(self, value):
+            try:
+                return self.type.parse(value)
+            except ValueError as err:
+                raise ManifestError(f'Failed to marshal {value}: {err}')
+
+        def unmarshal(self, value):
+            try:
+                return str(value)
+            except Exception as err:
+                raise ManifestError(f'Failed to unmarshal {value}: {err}')
+
+    @dataclass
+    class DefaultMarshaller(Marshaller):
+        """ Default marshaller that validates if the given
+        value is instance of given type. """
+
+        type: type
+
+        def marshal(self, value):
+            if not isinstance(value, self.type):
+                raise ManifestError(f'{value} is not of type {self.type.__name__}')
+            return value
+
+        def unmarshal(self, value):
+            return value
+
+    @dataclass
+    class ManifestNode(Marshaller, ABC):
+        """
+        Base class for any manifest object.
+
+        Attrs:
+            key: String representing the key for this object.
+        """
+
+        key: str
 
     @dataclass
     class ManifestRoot(ManifestNode):
@@ -65,7 +102,7 @@ class ManifestSchema:
 
     @dataclass
     class ManifestField(ManifestNode):
-        type: Callable
+        type: Any
         default: Optional[Any] = None
 
         def marshal(self, value):
@@ -74,16 +111,13 @@ class ManifestSchema:
                     return self.default
                 raise ManifestError(f'{self.key} is a required field but it is missing')
             try:
-                return_value = self.type(value)
+                return_value = self.type.marshal(value)
             except Exception as err:
-                raise ManifestError(f'Failed to convert {self.key}={value} to type {self.type.__name__}: {err}')
+                raise ManifestError(f'Failed to marshal manifest: {err}')
             return return_value
 
         def unmarshal(self, value):
-            # return raw value for built-in types which can be serialized by JSONEncoder
-            if self.type in (dict, list, tuple, str, int, float, bool):
-                return value
-            return str(value)
+            return self.type.unmarshal(value)
 
     @dataclass
     class ManifestArray(ManifestNode):
@@ -93,76 +127,66 @@ class ManifestSchema:
             if value is None:
                 return []
 
-            def marshal(v):
-                if isinstance(self.type, ManifestSchema.ManifestNode):
-                    return self.type.marshal(v)
-                else:
-                    return self.type(v)
-
             return_value = []
             try:
                 for item in value:
-                    return_value.append(marshal(item))
+                    return_value.append(self.type.marshal(item))
             except Exception as err:
                 raise ManifestError(f'Failed to convert {self.key}={value} to array: {err}')
 
             return return_value
 
         def unmarshal(self, value):
-            def unmarshal(v):
-                if isinstance(self.type, ManifestSchema.ManifestNode):
-                    return self.type.unmarshal(v)
-                else:
-                    return str(v)
-            return [unmarshal(item) for item in value]
+            return [self.type.unmarshal(item) for item in value]
 
     # TODO: add description for each field
     SCHEMA = ManifestRoot('root', [
-        ManifestField('version', Version.parse, Version(1, 0, 0)),
+        ManifestField('version', ParsedMarshaller(Version), Version(1, 0, 0)),
         ManifestRoot('package', [
-            ManifestField('version', Version.parse),
-            ManifestField('name', str),
-            ManifestField('base-os-constraint', VersionConstraint.parse, VersionRange()),
-            ManifestArray('depends', PackageConstraint.parse),
-            ManifestArray('breaks', PackageConstraint.parse),
-            ManifestField('init-cfg', dict, dict()),
-            ManifestField('changelog', dict, dict()),
-            ManifestField('debug-dump', str, ''),
+            ManifestField('version', ParsedMarshaller(Version)),
+            ManifestField('name', DefaultMarshaller(str)),
+            ManifestField('base-os-constraint', ParsedMarshaller(VersionConstraint), VersionRange()),
+            ManifestArray('depends', ParsedMarshaller(PackageConstraint)),
+            ManifestArray('breaks', ParsedMarshaller(PackageConstraint)),
+            ManifestField('init-cfg', DefaultMarshaller(dict), dict()),
+            ManifestField('changelog', DefaultMarshaller(dict), dict()),
+            ManifestField('debug-dump', DefaultMarshaller(str), ''),
         ]),
         ManifestRoot('service', [
-            ManifestField('name', str),
-            ManifestArray('requires', str),
-            ManifestArray('requisite', str),
-            ManifestArray('wanted-by', str),
-            ManifestArray('after', str),
-            ManifestArray('before', str),
-            ManifestArray('dependent', str),
-            ManifestArray('dependent-of', str),
-            ManifestField('post-start-action', str, ''),
-            ManifestField('pre-shutdown-action', str, ''),
-            ManifestField('asic-service', bool, False),
-            ManifestField('host-service', bool, True),
-            ManifestField('delayed', bool, False),
+            ManifestField('name', DefaultMarshaller(str)),
+            ManifestArray('requires', DefaultMarshaller(str)),
+            ManifestArray('requisite', DefaultMarshaller(str)),
+            ManifestArray('wanted-by', DefaultMarshaller(str)),
+            ManifestArray('after', DefaultMarshaller(str)),
+            ManifestArray('before', DefaultMarshaller(str)),
+            ManifestArray('dependent', DefaultMarshaller(str)),
+            ManifestArray('dependent-of', DefaultMarshaller(str)),
+            ManifestField('post-start-action', DefaultMarshaller(str), ''),
+            ManifestField('pre-shutdown-action', DefaultMarshaller(str), ''),
+            ManifestField('asic-service', DefaultMarshaller(bool), False),
+            ManifestField('host-service', DefaultMarshaller(bool), True),
+            ManifestField('delayed', DefaultMarshaller(bool), False),
         ]),
         ManifestRoot('container', [
-            ManifestField('privileged', bool, False),
-            ManifestArray('volumes', str),
+            ManifestField('privileged', DefaultMarshaller(bool), False),
+            ManifestArray('volumes', DefaultMarshaller(str)),
             ManifestArray('mounts', ManifestRoot('mounts', [
-                ManifestField('source', str),
-                ManifestField('target', str),
-                ManifestField('type', str),
+                ManifestField('source', DefaultMarshaller(str)),
+                ManifestField('target', DefaultMarshaller(str)),
+                ManifestField('type', DefaultMarshaller(str)),
             ])),
-            ManifestField('environment', dict, dict()),
+            ManifestField('environment', DefaultMarshaller(dict), dict()),
+            ManifestArray('tmpfs', DefaultMarshaller(str)),
         ]),
         ManifestArray('processes', ManifestRoot('processes', [
-            ManifestField('critical', bool),
-            ManifestField('name', str),
-            ManifestField('command', str),
+            ManifestField('critical', DefaultMarshaller(bool)),
+            ManifestField('name', DefaultMarshaller(str)),
+            ManifestField('command', DefaultMarshaller(str)),
         ])),
         ManifestRoot('cli', [
-            ManifestField('show', str, ''),
-            ManifestField('config', str, ''),
-            ManifestField('clear', str, '')
+            ManifestField('show', DefaultMarshaller(str), ''),
+            ManifestField('config', DefaultMarshaller(str), ''),
+            ManifestField('clear', DefaultMarshaller(str), '')
         ])
     ])
 

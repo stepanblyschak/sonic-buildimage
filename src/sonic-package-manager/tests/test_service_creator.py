@@ -126,9 +126,10 @@ def test_feature_registration(mock_sonic_db, manifest):
         ('state', 'disabled'),
         ('auto_restart', 'enabled'),
         ('high_mem_alert', 'disabled'),
+        ('set_owner', 'local'),
         ('has_per_asic_scope', 'False'),
         ('has_global_scope', 'True'),
-        ('has_timer', 'False')
+        ('has_timer', 'False'),
     ])
 
 
@@ -145,7 +146,27 @@ def test_feature_registration_with_timer(mock_sonic_db, manifest):
         ('state', 'disabled'),
         ('auto_restart', 'enabled'),
         ('high_mem_alert', 'disabled'),
+        ('set_owner', 'local'),
         ('has_per_asic_scope', 'False'),
         ('has_global_scope', 'True'),
-        ('has_timer', 'True')
+        ('has_timer', 'True'),
+    ])
+
+
+def test_feature_registration_with_non_default_owner(mock_sonic_db, manifest):
+    mock_feature_table = Mock()
+    mock_feature_table.get = Mock(return_value=(False, ()))
+    mock_sonic_db.initial_table = Mock(return_value=mock_feature_table)
+    mock_sonic_db.persistent_table = Mock(return_value=mock_feature_table)
+    mock_sonic_db.running_table = Mock(return_value=mock_feature_table)
+    feature_registry = FeatureRegistry(mock_sonic_db)
+    feature_registry.register(manifest, owner='kube')
+    mock_feature_table.set.assert_called_with('test', [
+        ('state', 'disabled'),
+        ('auto_restart', 'enabled'),
+        ('high_mem_alert', 'disabled'),
+        ('set_owner', 'kube'),
+        ('has_per_asic_scope', 'False'),
+        ('has_global_scope', 'True'),
+        ('has_timer', 'False'),
     ])

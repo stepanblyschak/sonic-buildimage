@@ -3,7 +3,6 @@ import contextlib
 import json
 import os
 
-import swsssdk
 from swsscommon import swsscommon
 
 from sonic_package_manager.service_creator import ETC_SONIC_PATH
@@ -12,26 +11,6 @@ from sonic_package_manager.service_creator.utils import in_chroot
 CONFIG_DB = 'CONFIG_DB'
 CONFIG_DB_JSON = os.path.join(ETC_SONIC_PATH, 'config_db.json')
 INIT_CFG_JSON = os.path.join(ETC_SONIC_PATH, 'init_cfg.json')
-
-
-def is_db_alive():
-    """ Check if database is alive or not. """
-
-    # In chroot we can connect to a running
-    # DB via TCP socket, we should ignore this case.
-    if in_chroot():
-        return False
-
-    # FIXME: swsscommon immediately crashes the whole python process
-    #        in case redis connection failed. This is not possible to handle
-    #        but installing a package while database is not running is completely
-    #        OK for this application. Requires a fix in pyswsscommon
-    conn = swsssdk.ConfigDBConnector()
-    try:
-        conn.connect()
-        return True
-    except Exception:
-        return False
 
 
 class FileDbTable:
@@ -88,11 +67,17 @@ class SonicDB:
     def running_table(cls, table):
         """ Returns running DB table. """
 
-        if not is_db_alive():
+        # In chroot we can connect to a running
+        # DB via TCP socket, we should ignore this case.
+        if in_chroot():
             return None
 
         if cls._running is None:
-            cls._running = swsscommon.DBConnector(CONFIG_DB, 0)
+            try:
+                cls._running = swsscommon.DBConnector(CONFIG_DB, 0)
+            except RuntimeError:
+                # Failed to connect to DB.
+                return None
 
         return swsscommon.Table(cls._running, table)
 

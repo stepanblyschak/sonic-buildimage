@@ -218,11 +218,15 @@ def remove(ctx, name):
 @cli.command()
 @click.option('-f', '--force', is_flag=True)
 @click.option('-y', '--yes', is_flag=True)
+@click.option('--enable', is_flag=True)
+@click.option('--default-owner',
+              type=click.Choice(['local', 'kube']),
+              default='local')
 @click.argument('expression')
 @click.pass_context
 @click_log.simple_verbosity_option(log)
 @root_privileges_required
-def install(ctx, expression, force, yes):
+def install(ctx, expression, force, yes, enable, default_owner):
     """ Install a package. """
 
     manager: PackageManager = ctx.obj
@@ -232,7 +236,7 @@ def install(ctx, expression, force, yes):
                       f'continue?', abort=True, show_default=True)
 
     try:
-        manager.install(expression, force)
+        manager.install(expression, force, enable, default_owner)
     except Exception as err:
         exit_cli(f'Failed to install package {expression}: {err}', fg='red')
     except KeyboardInterrupt:
@@ -290,11 +294,12 @@ def uninstall(ctx, name, force, yes):
 @cli.command()
 @click.option('-f', '--force', is_flag=True)
 @click.option('-y', '--yes', is_flag=True)
+@click.option('--dockerd-socket', type=click.Path())
 @click.argument('database', type=click.Path())
 @click.pass_context
 @click_log.simple_verbosity_option(log)
 @root_privileges_required
-def migrate(ctx, database, force, yes):
+def migrate(ctx, database, force, yes, dockerd_socket):
     """ Migrate SONiC packages from the given database file. """
 
     manager: PackageManager = ctx.obj
@@ -303,7 +308,7 @@ def migrate(ctx, database, force, yes):
         click.confirm('Continue with package migration?', abort=True, show_default=True)
 
     try:
-        manager.migrate_packages(PackageDatabase.from_file(database))
+        manager.migrate_packages(PackageDatabase.from_file(database), dockerd_socket)
     except Exception as err:
         exit_cli(f'Failed to migrate packages {err}', fg='red')
     except KeyboardInterrupt:

@@ -5,7 +5,7 @@ from unittest.mock import Mock, MagicMock
 
 import pytest
 
-from sonic_package_manager.database import PackageDatabase, PackageEntry
+from sonic_package_manager.database import PackageDatabase, PackageEntry, BASE_LIBRARY_PATH
 from sonic_package_manager.manager import DockerApi, PackageManager
 from sonic_package_manager.manifest import Manifest
 from sonic_package_manager.manifest_resolver import ManifestResolver
@@ -302,7 +302,7 @@ def fake_db_for_migration(mock_docker_api, mock_registry_resolver):
     yield PackageDatabase(content)
 
 
-@pytest.fixture
+@pytest.fixture()
 def sonic_fs(fs):
     fs.create_file('/proc/1/root')
     fs.create_dir(ETC_SONIC_PATH)
@@ -335,7 +335,8 @@ def package_manager(mock_docker_api,
     yield PackageManager(mock_docker_api, mock_registry_resolver,
                          fake_db, fake_manifest_resolver,
                          mock_service_creator,
-                         fake_device_info)
+                         fake_device_info,
+                         MagicMock())
 
 
 @pytest.fixture

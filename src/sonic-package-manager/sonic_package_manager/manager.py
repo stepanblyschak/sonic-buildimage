@@ -3,14 +3,16 @@ import contextlib
 import functools
 import os
 import pkgutil
-from typing import Dict, Any, Iterable
+import tempfile
+from typing import Dict, Any, Iterable, Optional, Callable
 
 import docker
+import filelock as filelock
 from sonic_py_common import device_info
 
 from sonic_package_manager import utils
 from sonic_package_manager.constraint import PackageConstraint
-from sonic_package_manager.database import PackageDatabase, PackageEntry
+from sonic_package_manager.database import PackageDatabase, PackageEntry, PACKAGE_MANAGER_LOCK_FILE
 from sonic_package_manager.dockerapi import DockerApi, get_repository_from_image
 from sonic_package_manager.errors import (
     PackageInstallationError,
@@ -44,6 +46,29 @@ def failure_ignore(ignore: bool):
             log.warning(f'ignoring error {err}')
         else:
             raise
+
+
+def under_lock(func: Callable) -> Callable:
+    """ Execute operations under lock. """
+
+    def wrapped_function(*args, **kwargs):
+        self = args[0]
+        with self.lock:
+            return func(*args, **kwargs)
+    return wrapped_function
+
+
+def rollback_wrapper(func, *args, **kwargs):
+    """ Used in rollback callbacks to ignore failure
+    but proceed with rollback. Error will be printed
+    but not fail the whole procedure of rollback. """
+
+    def wrapper():
+        try:
+            functools.partial(func, *args, **kwargs)
+        except Exception as err:
+            log.error(f'failed in rollback: {err}')
+    return wrapper
 
 
 def package_constraint_to_reference(constraint: PackageConstraint) -> PackageReference:
@@ -109,9 +134,11 @@ class PackageManager:
                  database: PackageDatabase,
                  manifest_resolver: ManifestResolver,
                  service_creator: ServiceCreator,
-                 device_information: Any):
+                 device_information: Any,
+                 lock: filelock.FileLock):
         """ Initialize PackageManager. """
 
+        self.lock = lock
         self.docker = dockerapi
         self.registry_resolver = registry_resolver
         self.database = database
@@ -123,6 +150,7 @@ class PackageManager:
         self.version_info = device_information.get_sonic_version_info()
         self.base_os_version = Version.parse(self.version_info.get('base_os_compatibility_version'))
 
+    @under_lock
     def add_repository(self, *args, **kwargs):
         """ Add repository to package database.
 
@@ -131,6 +159,7 @@ class PackageManager:
         self.database.add_package(*args, **kwargs)
         self.database.commit()
 
+    @under_lock
     def remove_repository(self, name: str):
         """ Remove repository from package database.
 
@@ -141,7 +170,12 @@ class PackageManager:
         self.database.remove_package(name)
         self.database.commit()
 
-    def install(self, expression: str, force=False):
+    @under_lock
+    def install(self,
+                expression: str,
+                force=False,
+                enable=False,
+                default_owner='local'):
         """ Install a SONiC Package from the package reference
         expression string. Can force the installation if force parameter
         is True.
@@ -149,6 +183,8 @@ class PackageManager:
         Args:
             expression: SONiC Package reference expression
             force: Force the installation.
+            enable: If True the installed feature package will be enabled.
+            default_owner: Owner of the installed package.
         Raises:
             PackageManagerError
         """
@@ -161,6 +197,7 @@ class PackageManager:
                 raise PackageInstallationError(f'{name} is already installed')
 
         version_constraint = package.manifest['package']['base-os-constraint']
+        feature_state = 'enabled' if enable else 'disabled'
 
         with failure_ignore(force):
             if not version_constraint.allows_all(self.base_os_version):
@@ -176,28 +213,23 @@ class PackageManager:
 
         try:
             with contextlib.ExitStack() as exit_stack:
-                if package.entry.repository:
+                if package.reference:
                     image = self.docker.pull(package.repository, package.reference)
-                    exit_stack.callback(functools.partial(self.docker.rmi, image.id))
+                    exit_stack.callback(rollback_wrapper(self.docker.rmi, image.id))
                 else:
                     image = self.docker.load(expression)
-                    repository = get_repository_from_image(image)
-                    if not repository:
-                        # This means the image was saved as unnamed.
-                        # Using package name as a repository.
-                        repository = package.name
-                    package.entry.repository = repository
-                    exit_stack.callback(functools.partial(self.docker.rmi, image.id))
+                    self._init_repository_from_image(package, image)
+                    exit_stack.callback(rollback_wrapper(self.docker.rmi, image.id))
 
                 repotag = f'{package.repository}:latest'
                 self.docker.tag(image.id, repotag)
-                exit_stack.callback(functools.partial(self.docker.rmi, repotag))
+                exit_stack.callback(rollback_wrapper(self.docker.rmi, repotag))
 
-                self.service_creator.create(package)
-                exit_stack.callback(functools.partial(self.service_creator.remove, package))
+                self.service_creator.create(package, state=feature_state, owner=default_owner)
+                exit_stack.callback(rollback_wrapper(self.service_creator.remove, package))
 
                 self._install_cli_plugins(package)
-                exit_stack.callback(functools.partial(self._uninstall_cli_plugins, package))
+                exit_stack.callback(rollback_wrapper(self._uninstall_cli_plugins, package))
 
                 exit_stack.pop_all()
         except Exception as err:
@@ -206,9 +238,14 @@ class PackageManager:
             raise
 
         package.entry.installed = True
+        # When installing package from a tarball, package
+        # may not be in database.
+        if not self.database.has_package(package.name):
+            self.database.add_package(package.name, package.repository)
         self.database.update_package(package.entry)
         self.database.commit()
 
+    @under_lock
     def uninstall(self, name: str, force=False):
         """ Uninstall a SONiC Package referenced by name.
         The uninstallation can be forced if force argument is
@@ -263,6 +300,7 @@ class PackageManager:
         self.database.update_package(package.entry)
         self.database.commit()
 
+    @under_lock
     def upgrade(self, expression: str, force=False):
         """ Upgrade a SONiC Package to a version the package reference
         expression specifies. Can force the upgrade if force parameter
@@ -326,30 +364,24 @@ class PackageManager:
         try:
             with contextlib.ExitStack() as exit_stack:
                 self._uninstall_cli_plugins(old_package)
-                exit_stack.callback(functools.partial(self._install_cli_plugins, old_package))
+                exit_stack.callback(rollback_wrapper(self._install_cli_plugins, old_package))
 
-                if new_package.entry.repository:
+                if new_package.reference:
                     image = self.docker.pull(new_package.repository, new_package.reference)
-                    exit_stack.callback(functools.partial(self.docker.rmi, image.id))
+                    exit_stack.callback(rollback_wrapper(self.docker.rmi, image.id))
                 else:
                     image = self.docker.load(expression)
-                    # get the repository name from
-                    repository = get_repository_from_image(image)
-                    if not repository:
-                        # This means the image was saved as unnamed.
-                        # Using package name as a repository.
-                        repository = new_package.name
-                    new_package.entry.repository = repository
-                    exit_stack.callback(functools.partial(self.docker.rmi, image.id))
+                    self._init_repository_from_image(new_package, image)
+                    exit_stack.callback(rollback_wrapper(self.docker.rmi, image.id))
 
                 if self.feature_registry.is_feature_enabled(old_feature):
                     self._systemctl_action(old_package, 'stop')
-                    exit_stack.callback(functools.partial(self._systemctl_action,
-                                                          old_package, 'start'))
+                    exit_stack.callback(rollback_wrapper(self._systemctl_action,
+                                                         old_package, 'start'))
 
                 self.service_creator.remove(old_package, deregister_feature=False)
-                exit_stack.callback(functools.partial(self.service_creator.create,
-                                                      old_package, register_feature=False))
+                exit_stack.callback(rollback_wrapper(self.service_creator.create,
+                                                     old_package, register_feature=False))
 
                 # This is no return point, after we start removing old Docker images
                 # there is no guaranty we can actually successfully roll-back.
@@ -385,7 +417,10 @@ class PackageManager:
         self.database.update_package(new_package_entry)
         self.database.commit()
 
-    def migrate_packages(self, old_package_database: PackageDatabase):
+    @under_lock
+    def migrate_packages(self,
+                         old_package_database: PackageDatabase,
+                         dockerd_sock: Optional[str] = None):
         """ Migrate packages from old database. This function can
         do a comparison between current database and the database
         passed in as argument.
@@ -397,14 +432,38 @@ class PackageManager:
         the never version.
             If the package is installed in the passed database and in the current
         it is installed but with never version - no actions are taken.
+            If dockerd_sock parameter is passed, the migration process will use loaded
+        images from docker library of the currently installed image.
 
         Args:
             old_package_database: SONiC Package Database to migrate packages from.
+            dockerd_sock: Path to dockerd socket.
         Raises:
             PackageManagerError
         """
 
         self._migrate_package_database(old_package_database)
+
+        def migrate_package(package_entry, migrate_operation=self.install):
+            if migrate_operation == self.install:
+                log_msg_operation = 'installing'
+            elif migrate_operation == self.upgrade:
+                log_msg_operation = 'upgrading'
+            else:
+                raise ValueError(f'Invalid operation passed in {migrate_operation}')
+
+            if dockerd_sock:
+                log.info(f'{log_msg_operation} {package_entry.name} from old docker library')
+                dockerapi = DockerApi(docker.DockerClient(base_url=f'unix://{dockerd_sock}'))
+                repotag = f'{package_entry.repository}:latest'
+                image = dockerapi.get_image(repotag)
+                with tempfile.NamedTemporaryFile('wb') as file:
+                    for chunk in image.save(named=True):
+                        file.write(chunk)
+                    migrate_operation(file.name)
+            else:
+                log.info(f'{log_msg_operation} {package_entry.name} version {package_entry.version}')
+                migrate_operation(f'{package_entry.name}=={package_entry.version}')
 
         # TODO: Topological sort packages by their dependencies first.
         for old_package in old_package_database:
@@ -414,30 +473,34 @@ class PackageManager:
             log.info(f'migrating package {old_package.name}')
 
             new_package = self.database.get_package(old_package.name)
-            if new_package.installed or new_package.default_reference is not None:
-                new_package_ref = PackageReference(new_package.name, new_package.default_reference)
-                pkg = self.query_package(new_package_ref)
-                new_package_version = pkg.manifest['package']['version']
 
-                if old_package.version > new_package_version:
-                    log.info(f'old package version is greater then default version in new image: '
-                             f'{old_package.version} > {new_package_version}')
-                    if new_package.installed:
-                        log.info(f'upgrading {new_package.name} to {old_package.version}')
-                        self.upgrade(f'{new_package.name}=={old_package.version}')
-                    else:
-                        log.info(f'installing {new_package.name} version {old_package.version}')
-                        self.install(f'{new_package.name}=={old_package.version}')
+            if new_package.installed:
+                if old_package.version > new_package.version:
+                    log.info(f'{old_package.name} package version is greater '
+                             f'then installed in new image: '
+                             f'{old_package.version} > {new_package.version}')
+                    log.info(f'upgrading {new_package.name} to {old_package.version}')
+                    new_package.version = old_package.version
+                    migrate_package(new_package, self.upgrade)
                 else:
-                    if not new_package.installed:
-                        log.info(f'installing {new_package.name} version {new_package_version}')
-                        self.install(f'{new_package.name}=={new_package_version}')
-                    else:
-                        log.info(f'skipping {new_package.name} as installed version is newer')
+                    log.info(f'skipping {new_package.name} as installed version is newer')
+            elif new_package.default_reference is not None:
+                new_package_ref = PackageReference(new_package.name, new_package.default_reference)
+                package = self.query_package(new_package_ref)
+                new_package_default_version = package.manifest['package']['version']
+                if old_package.version > new_package_default_version:
+                    log.info(f'{old_package.name} package version is lower '
+                             f'then the default in new image: '
+                             f'{old_package.version} > {new_package_default_version}')
+                    new_package.version = old_package.version
+                    migrate_package(new_package)
+                else:
+                    self.install(f'{new_package.name}=={new_package_default_version}')
             else:
                 # No default version and package is not installed.
-                log.info(f'installing {new_package.name} version {old_package.version}')
-                self.install(f'{new_package.name}=={old_package.version}')
+                # Migrate old package same version.
+                new_package.version = old_package.version
+                migrate_package(new_package, self.install)
 
             self.database.commit()
 
@@ -494,10 +557,17 @@ class PackageManager:
         name = manifest['package']['name']
         version = manifest['package']['version']
 
-        # put an empty repository, since this is a local installation
-        # repository has to be initialized after the local image is loaded.
-        repository = ''
-        reference = version_to_tag(version)
+        if self.database.has_package(name):
+            # inherit package database info
+            package = self.database.get_package(name)
+            repository = package.repository
+        else:
+            # put an empty repository, since this is a local installation
+            # repository has to be initialized after the local image is loaded.
+            repository = ''
+
+        # Put empty reference, since this is a local installation
+        reference = ''
 
         return Package(
             PackageEntry(
@@ -602,6 +672,15 @@ class PackageManager:
         packages.pop(package.name)
         return packages
 
+    # TODO: Replace with "config feature" command.
+    # The problem with current "config feature" command
+    # is that it is asynchronous, thus can't be used
+    # for package upgrade purposes where we need to wait
+    # till service stops before upgrading docker image.
+    # It would be really handy if we could just call
+    # smth like: "config feature state <name> <state> --wait"
+    # instead of operating on systemd service since
+    # this is basically a duplicated code from hostcfgd.
     def _systemctl_action(self, package: Package, action: str):
         name = package.manifest['service']['name']
         host_service = package.manifest['service']['host-service']
@@ -617,6 +696,21 @@ class PackageManager:
         if multi_instance:
             for npu in range(self.num_npus):
                 run_command(f'systemctl {action} {name}@{npu}')
+
+    @staticmethod
+    def _init_repository_from_image(package: Package, image):
+        """ Set package repository based on image if
+        package has no repository set. """
+
+        if package.repository:  # already set
+            return
+
+        repository = get_repository_from_image(image)
+        if not repository:
+            # This means the image was saved as unnamed.
+            # Using package name as a repository.
+            repository = package.name
+        package.entry.repository = repository
 
     @staticmethod
     def _get_cli_plugin_name(package: Package):
@@ -664,4 +758,5 @@ class PackageManager:
                               PackageDatabase.from_file(),
                               ManifestResolver(docker_api, registry_resolver),
                               ServiceCreator(FeatureRegistry(SonicDB), SonicDB),
-                              device_info)
+                              device_info,
+                              filelock.FileLock(PACKAGE_MANAGER_LOCK_FILE, timeout=0))
