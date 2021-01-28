@@ -244,6 +244,16 @@ sudo rm -rf $FILESYSTEM_ROOT/$SONIC_UTILITIES_PY3_WHEEL_NAME
 sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/sonic-utilities-data_*.deb || \
     sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
 
+# Install SONiC Package Manager Python 3 package
+SONIC_PACKAGE_MANAGER_PY3_WHEEL_NAME=$(basename {{sonic_package_manager_py3_wheel_path}})
+sudo cp {{sonic_package_manager_py3_wheel_path}} $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_PY3_WHEEL_NAME
+sudo https_proxy=$https_proxy LANG=C chroot $FILESYSTEM_ROOT pip3 install $SONIC_PACKAGE_MANAGER_PY3_WHEEL_NAME
+sudo rm -rf $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_PY3_WHEEL_NAME
+
+# Install sonic-package-manager data files (and any dependencies via 'apt-get -y install -f')
+sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/sonic-package-manager-data_*.deb || \
+    sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
+
 # sonic-utilities-data installs bash-completion as a dependency. However, it is disabled by default
 # in bash.bashrc, so we copy a version of the file with it enabled here.
 sudo cp -f $IMAGE_CONFIGS/bash/bash.bashrc $FILESYSTEM_ROOT/etc/

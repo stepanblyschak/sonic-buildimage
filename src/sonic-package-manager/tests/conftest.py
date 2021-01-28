@@ -1,0 +1,361 @@
+#!/usr/bin/env python
+
+from dataclasses import dataclass
+from unittest import mock
+from unittest.mock import Mock, MagicMock
+
+import pytest
+from docker_image.reference import Reference
+
+from sonic_package_manager.database import PackageDatabase, PackageEntry
+from sonic_package_manager.manager import DockerApi, PackageManager
+from sonic_package_manager.manifest import Manifest
+from sonic_package_manager.manifest_resolver import ManifestResolver
+from sonic_package_manager.registry import RegistryResolver
+from sonic_package_manager.service_creator.creator import *
+
+
+@pytest.fixture
+def mock_docker_api():
+    docker = MagicMock(DockerApi)
+
+    @dataclass
+    class Image:
+        id: str
+
+    def pull(repo, ref):
+        return Image(f'{repo}:latest')
+
+    def load(filename):
+        return Image(filename)
+
+    docker.pull = MagicMock(side_effect=pull)
+    docker.load = MagicMock(side_effect=load)
+
+    yield docker
+
+
+@pytest.fixture
+def mock_registry_resolver():
+    yield Mock(RegistryResolver)
+
+
+@pytest.fixture
+def mock_manifest_resolver():
+    yield Mock(ManifestResolver)
+
+
+@pytest.fixture
+def mock_feature_registry():
+    yield MagicMock()
+
+
+@pytest.fixture
+def mock_service_creator():
+    yield Mock()
+
+
+@pytest.fixture
+def mock_sonic_db():
+    yield Mock()
+
+
+@pytest.fixture
+def fake_manifest_resolver():
+    class FakeManifestResolver:
+        def __init__(self):
+            self.manifests = {}
+            self.add('docker-database', 'latest', 'database', '1.0.0')
+            self.add('docker-orchagent', 'latest', 'swss', '1.0.0')
+            self.add('Azure/docker-test', '1.6.0', 'test-package', '1.6.0')
+            self.add('Azure/docker-test-2', '1.5.0', 'test-package-2', '1.5.0')
+            self.add('Azure/docker-test-2', '2.0.0', 'test-package-2', '2.0.0')
+            self.add('Azure/docker-test-3', 'latest', 'test-package-3', '1.6.0')
+            self.add('Azure/docker-test-3', '1.5.0', 'test-package-3', '1.5.0')
+            self.add('Azure/docker-test-3', '1.6.0', 'test-package-3', '1.6.0')
+            self.add('Azure/docker-test-4', '1.5.0', 'test-package-4', '1.5.0')
+            self.add('Azure/docker-test-5', '1.5.0', 'test-package-5', '1.5.0')
+            self.add('Azure/docker-test-5', '1.9.0', 'test-package-5', '1.9.0')
+            self.add('Azure/docker-test-6', '1.5.0', 'test-package-6', '1.5.0')
+            self.add('Azure/docker-test-6', '1.9.0', 'test-package-6', '1.9.0')
+            self.add('Azure/docker-test-6', '2.0.0', 'test-package-6', '2.0.0')
+            self.add('Azure/docker-test-6', 'latest', 'test-package-6', '1.5.0')
+
+        def from_registry(self, repository: str, reference: str):
+            return Manifest.marshal(self.manifests[repository][reference]['manifest'])
+
+        def from_local(self, image: str):
+            ref = Reference.parse(image)
+            return Manifest.marshal(self.manifests[ref['name']][ref['tag']]['manifest'])
+
+        def from_tarball(self, filepath: str) -> Manifest:
+            path, ref = filepath.split(':')
+            return Manifest.marshal(self.manifests[path][ref]['manifest'])
+
+        def add(self, repo, reference, name, version):
+            repo_dict = self.manifests.setdefault(repo, {})
+            repo_dict[reference] = {
+                'manifest': {
+                    'package': {
+                        'version': version,
+                        'name': name,
+                    },
+                    'service': {
+                        'name': name,
+                    }
+                },
+            }
+
+    yield FakeManifestResolver()
+
+
+@pytest.fixture
+def fake_device_info():
+    class FakeDeviceInfo:
+        def __init__(self):
+            self.multi_npu = True
+            self.num_npus = 1
+            self.compat = '1.0.0'
+
+        def is_multi_npu(self):
+            return self.multi_npu
+
+        def get_num_npus(self):
+            return self.num_npus
+
+        def get_sonic_version_info(self):
+            return {
+                'base_os_compatibility_version': self.compat
+            }
+
+    yield FakeDeviceInfo()
+
+
+def add_package(content, manifests, repository, reference, **kwargs):
+    manifest = manifests.from_registry(repository, reference)
+    name = manifest['package']['name']
+    version = manifest['package']['version']
+    installed = kwargs.get('installed', False)
+    built_in = kwargs.get('built-in', False)
+
+    if installed and not built_in and 'image_id' not in kwargs:
+        kwargs['image_id'] = f'{repository}:{reference}'
+
+    if installed and 'version' not in kwargs:
+        kwargs['version'] = version
+
+    content[name] = PackageEntry(name, repository,**kwargs)
+
+
+@pytest.fixture
+def fake_db(fake_manifest_resolver):
+    content = {}
+
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'docker-database',
+        'latest',
+        description='SONiC database service',
+        default_reference='1.0.0',
+        installed=True,
+        built_in=True
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'docker-orchagent',
+        'latest',
+        description='SONiC switch state service',
+        default_reference='1.0.0',
+        installed=True,
+        built_in=True
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test',
+        '1.6.0',
+        description='SONiC Package Manager Test Package',
+        default_reference='1.6.0',
+        installed=False,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-2',
+        '1.5.0',
+        description='SONiC Package Manager Test Package #2',
+        default_reference='1.5.0',
+        installed=False,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-3',
+        '1.5.0',
+        description='SONiC Package Manager Test Package #3',
+        default_reference='1.5.0',
+        installed=True,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-5',
+        '1.9.0',
+        description='SONiC Package Manager Test Package #5',
+        default_reference='1.9.0',
+        installed=False,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-6',
+        '1.5.0',
+        description='SONiC Package Manager Test Package #6',
+        default_reference='1.5.0',
+        installed=False,
+        built_in=False
+    )
+
+    yield PackageDatabase(content)
+
+
+@pytest.fixture
+def fake_db_for_migration(fake_manifest_resolver):
+    content = {}
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'docker-database',
+        'latest',
+        description='SONiC database service',
+        default_reference='1.0.0',
+        installed=True,
+        built_in=True
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'docker-orchagent',
+        'latest',
+        description='SONiC switch state service',
+        default_reference='1.0.0',
+        installed=True,
+        built_in=True
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test',
+        '1.6.0',
+        description='SONiC Package Manager Test Package',
+        default_reference='1.6.0',
+        installed=False,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-2',
+        '2.0.0',
+        description='SONiC Package Manager Test Package #2',
+        default_reference='2.0.0',
+        installed=False,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-3',
+        '1.6.0',
+        description='SONiC Package Manager Test Package #3',
+        default_reference='1.6.0',
+        installed=True,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-4',
+        '1.5.0',
+        description='SONiC Package Manager Test Package #4',
+        default_reference='1.5.0',
+        installed=True,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-5',
+        '1.5.0',
+        description='SONiC Package Manager Test Package #5',
+        default_reference='1.5.0',
+        installed=True,
+        built_in=False
+    )
+    add_package(
+        content,
+        fake_manifest_resolver,
+        'Azure/docker-test-6',
+        '2.0.0',
+        description='SONiC Package Manager Test Package #6',
+        default_reference='2.0.0',
+        installed=True,
+        built_in=False
+    )
+
+    yield PackageDatabase(content)
+
+
+@pytest.fixture()
+def sonic_fs(fs):
+    fs.create_file('/proc/1/root')
+    fs.create_dir(ETC_SONIC_PATH)
+    fs.create_dir(SYSTEMD_LOCATION)
+    fs.create_dir(DOCKER_CTL_SCRIPT_LOCATION)
+    fs.create_dir(SERVICE_MGMT_SCRIPT_LOCATION)
+    fs.create_dir(MONIT_CONF_LOCATION)
+    fs.create_file(os.path.join(TEMPLATES_PATH, SERVICE_FILE_TEMPLATE))
+    fs.create_file(os.path.join(TEMPLATES_PATH, TIMER_UNIT_TEMPLATE))
+    fs.create_file(os.path.join(TEMPLATES_PATH, SERVICE_MGMT_SCRIPT_TEMPLATE))
+    fs.create_file(os.path.join(TEMPLATES_PATH, DOCKER_CTL_SCRIPT_TEMPLATE))
+    fs.create_file(os.path.join(TEMPLATES_PATH, MONIT_CONF_TEMPLATE))
+    fs.create_file(os.path.join(TEMPLATES_PATH, DEBUG_DUMP_SCRIPT_TEMPLATE))
+    yield fs
+
+
+@pytest.fixture(autouse=True)
+def patch_pkgutil():
+    with mock.patch('pkgutil.get_loader'):
+        yield
+
+
+@pytest.fixture
+def package_manager(mock_docker_api,
+                    mock_registry_resolver,
+                    mock_service_creator,
+                    fake_manifest_resolver,
+                    fake_db,
+                    fake_device_info):
+    yield PackageManager(mock_docker_api, mock_registry_resolver,
+                         fake_db, fake_manifest_resolver,
+                         mock_service_creator,
+                         fake_device_info,
+                         MagicMock())
+
+
+@pytest.fixture
+def anything():
+    """ Fixture that returns Any object that can be used in
+    assert_called_*_with to match any object passed. """
+
+    class Any:
+        def __eq__(self, other):
+            return True
+
+    yield Any()
