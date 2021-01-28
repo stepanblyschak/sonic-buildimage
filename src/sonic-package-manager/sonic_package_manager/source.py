@@ -7,7 +7,7 @@ from sonic_package_manager.manifest_resolver import ManifestResolver
 from sonic_package_manager.package import Package
 
 
-class PackageSource:
+class PackageSource(object):
     """ PackageSource abstracts the way manifest is read
     and image is retrieved based on different image sources.
     (i.e from registry, from tarball or locally installed) """

@@ -497,25 +497,45 @@ class PackageManager:
 
         self._migrate_package_database(old_package_database)
 
-        def migrate_package(package_entry, migrate_operation=self.install):
-            if migrate_operation == self.install:
-                log_msg_operation = 'installing'
-            elif migrate_operation == self.upgrade:
-                log_msg_operation = 'upgrading'
-            else:
+        def migrate_package(old_package_entry,
+                            new_package_entry,
+                            migrate_operation=None):
+            """ Migrate package routine
+
+            Args:
+                old_package_entry: Entry in old package database.
+                new_package_entry: Entry in new package database.
+                migrate_operation: Operation to perform: install or upgrade.
+            """
+
+            try:
+                migrate_func = {
+                    'install': self.install,
+                    'upgrade': self.upgrade,
+                }[migrate_operation]
+            except KeyError:
                 raise ValueError(f'Invalid operation passed in {migrate_operation}')
 
+            name = new_package_entry.name
+            version = new_package_entry.version
+
             if dockerd_sock:
-                log.info(f'{log_msg_operation} {package_entry.name} from old docker library')
+                # dockerd_sock is defined, so use docked_sock to connect to
+                # dockerd and fetch package image from it.
+                log.info(f'{migrate_operation} {name} from old docker library')
                 docker_api = DockerApi(docker.DockerClient(base_url=f'unix://{dockerd_sock}'))
-                image = docker_api.get_image(f'{package_entry.repository}:latest')
+
+                image = docker_api.get_image(old_package_entry.image_id)
+
                 with tempfile.NamedTemporaryFile('wb') as file:
                     for chunk in image.save(named=True):
                         file.write(chunk)
-                    migrate_operation(file.name)
+
+                    migrate_func(tarball=file.name)
             else:
-                log.info(f'{log_msg_operation} {package_entry.name} version {package_entry.version}')
-                migrate_operation(f'{package_entry.name}=={package_entry.version}')
+                log.info(f'{migrate_operation} {name} version {version}')
+
+                migrate_func(f'{name}=={version}')
 
         # TODO: Topological sort packages by their dependencies first.
         for old_package in old_package_database:
@@ -533,7 +553,7 @@ class PackageManager:
                              f'{old_package.version} > {new_package.version}')
                     log.info(f'upgrading {new_package.name} to {old_package.version}')
                     new_package.version = old_package.version
-                    migrate_package(new_package, self.upgrade)
+                    migrate_package(old_package, new_package, 'upgrade')
                 else:
                     log.info(f'skipping {new_package.name} as installed version is newer')
             elif new_package.default_reference is not None:
@@ -546,14 +566,14 @@ class PackageManager:
                              f'then the default in new image: '
                              f'{old_package.version} > {new_package_default_version}')
                     new_package.version = old_package.version
-                    migrate_package(new_package)
+                    migrate_package(old_package, new_package, 'install')
                 else:
                     self.install(f'{new_package.name}=={new_package_default_version}')
             else:
                 # No default version and package is not installed.
                 # Migrate old package same version.
                 new_package.version = old_package.version
-                migrate_package(new_package, self.install)
+                migrate_package(old_package, new_package, 'install')
 
             self.database.commit()
 
