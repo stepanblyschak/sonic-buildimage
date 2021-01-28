@@ -1,5 +1,8 @@
 FROM docker-fpm-quagga
 
+ARG docker_container_name
+ARG manifest
+
 ## Make apt-get non-interactive
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -26,5 +29,7 @@ COPY ["*.j2", "/usr/share/sonic/templates/"]
 COPY ["daemons", "/etc/quagga/"]
 COPY ["files/supervisor-proc-exit-listener", "/usr/bin"]
 COPY ["critical_processes", "/etc/supervisor"]
+
+LABEL com.azure.sonic.manifest="$manifest"
 
 ENTRYPOINT ["/usr/local/bin/supervisord"]
