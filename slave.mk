@@ -704,7 +704,24 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 		$(eval export $(subst -,_,$(notdir $($*.gz_PATH)))_pydebs=$(shell printf "$(subst $(SPACE),\n,$(call expand,$($*.gz_PYTHON_DEBS)))\n" | awk '!a[$$0]++'))
 		$(eval export $(subst -,_,$(notdir $($*.gz_PATH)))_whls=$(shell printf "$(subst $(SPACE),\n,$(call expand,$($*.gz_PYTHON_WHEELS)))\n" | awk '!a[$$0]++'))
 		$(eval export $(subst -,_,$(notdir $($*.gz_PATH)))_dbgs=$(shell printf "$(subst $(SPACE),\n,$(call expand,$($*.gz_DBG_PACKAGES)))\n" | awk '!a[$$0]++'))
+		$(eval export version=$($*.gz_VERSION))
+		$(eval export name=$($*.gz_CONTAINER_NAME))
+		$(eval export package_name=$($*.gz_PACKAGE_NAME))
+		$(eval export base_os_ver=$(BASE_OS_COMPATIBILITY_VERSION))
+		$(eval export asic_service=$(shell [ -f files/build_templates/per_namespace/$(name).service.j2 ] && echo true || echo false))
+		$(eval export host_service=$(shell [ -f files/build_templates/$(name).service.j2 ] && echo true || echo false))
+		$(eval export depends=$($*.gz_PACKAGE_DEPENDS))
+		$(eval export requires=$($*.gz_SERVICE_REQUIRES))
+		$(eval export after=$($*.gz_SERVICE_AFTER))
+		$(eval export before=$($*.gz_SERVICE_BEFORE))
+		$(eval export dependent_of=$($*.gz_SERVICE_DEPENDENT_OF))
+		$(eval export privileged=$($*.gz_CONTAINER_PRIVILEGED))
+		$(eval export volumes=$($*.gz_CONTAINER_VOLUMES))
+		$(eval export tmpfs=$($*.gz_CONTAINER_TMPFS))
+		$(eval export config_cli_plugin=$($*.gz_CLI_CONFIG_PLUGIN))
+		$(eval export show_cli_plugin=$($*.gz_CLI_SHOW_PLUGIN))
 		j2 $($*.gz_PATH)/Dockerfile.j2 > $($*.gz_PATH)/Dockerfile
+		j2 --customize scripts/j2cli/json_filter.py files/build_templates/manifest.json.j2 > $($*.gz_PATH)/manifest.json
 		docker info $(LOG)
 		docker build --squash --no-cache \
 			--build-arg http_proxy=$(HTTP_PROXY) \
@@ -715,6 +732,7 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 			--build-arg docker_container_name=$($*.gz_CONTAINER_NAME) \
 			--build-arg frr_user_uid=$(FRR_USER_UID) \
 			--build-arg frr_user_gid=$(FRR_USER_GID) \
+			--build-arg manifest="$$(cat $($*.gz_PATH)/manifest.json)" \
 			--label Tag=$(SONIC_IMAGE_VERSION) \
 			-t $* $($*.gz_PATH) $(LOG)
 		docker save $* | gzip -c > $@
