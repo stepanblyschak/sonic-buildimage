@@ -163,13 +163,14 @@ def list(ctx):
 
     try:
         for package in natsorted(manager.database):
+            repository = package.repository or 'N/A'
             version = package.version or 'N/A'
             description = package.description or 'N/A'
             status = get_package_status(package)
 
             table_body.append([
                 package.name,
-                package.repository,
+                repository,
                 description,
                 version,
                 status

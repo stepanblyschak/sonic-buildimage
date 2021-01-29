@@ -23,6 +23,10 @@ def mock_docker_api():
     class Image:
         id: str
 
+        @property
+        def attrs(self):
+            return {'RepoTags': [self.id]}
+
     def pull(repo, ref):
         return Image(f'{repo}:latest')
 

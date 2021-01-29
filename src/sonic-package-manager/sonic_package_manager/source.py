@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from sonic_package_manager.database import PackageDatabase, PackageEntry
-from sonic_package_manager.dockerapi import DockerApi
+from sonic_package_manager.dockerapi import DockerApi, get_repository_from_image
 from sonic_package_manager.manifest import Manifest
 from sonic_package_manager.manifest_resolver import ManifestResolver
 from sonic_package_manager.package import Package
@@ -22,21 +22,39 @@ class PackageSource(object):
 
     def get_manifest(self) -> Manifest:
         """ Returns package manifest.
+        Child class has to implement this method.
 
         Returns:
             Manifest
         """
         raise NotImplementedError
 
-    def install_image(self, package: Package):
-        """ Install image based on package source.
+    def install_image(self):
+        """ Install image based on package source. 
+        Child class has to implement this method.
+        
+        Returns:
+            Docker Image object.
+        """
+
+        raise NotImplementedError
+
+    def install(self, package: Package):
+        """ Install image based on package source,
+        record installation infromation in PackageEntry..
 
         Args:
             package: SONiC Package
         """
-        raise NotImplementedError
 
-    def uninstall_image(self, package: Package):
+        image = self.install_image()
+        package.entry.image_id = image.id
+        # if no repository is defined for this package
+        # get repository from image
+        if not package.repository:
+            package.entry.repository = get_repository_from_image(image)
+
+    def uninstall(self, package: Package):
         """ Uninstall image.
 
         Args:
@@ -91,13 +109,14 @@ class TarballSource(PackageSource):
         self.tarball_path = tarball_path
 
     def get_manifest(self) -> Manifest:
+        """ Returns manifest read from tarball. """
+
         return self.manifest_resolver.from_tarball(self.tarball_path)
 
-    def install_image(self, package: Package):
+    def install_image(self):
         """ Installs image from local tarball source. """
 
-        image = self.docker.load(self.tarball_path)
-        package.entry.image_id = image.id
+        return self.docker.load(self.tarball_path)
 
 
 class RegistrySource(PackageSource):
@@ -116,15 +135,16 @@ class RegistrySource(PackageSource):
         self.repository = repository
         self.reference = reference
 
-    def get_manifest(self):
+    def get_manifest(self) -> Manifest:
+        """ Returns manifest read from registry. """
+
         return self.manifest_resolver.from_registry(self.repository,
                                                     self.reference)
 
-    def install_image(self, package: Package):
-        """ Installs image from local tarball source. """
+    def install_image(self):
+        """ Installs image from registry. """
 
-        image = self.docker.pull(self.repository, self.reference)
-        package.entry.image_id = image.id
+        return self.docker.pull(self.repository, self.reference)
 
 
 class LocalSource(PackageSource):
@@ -141,7 +161,9 @@ class LocalSource(PackageSource):
                          manifest_resolver)
         self.entry = entry
 
-    def get_manifest(self):
+    def get_manifest(self) -> Manifest:
+        """ Returns manifest read from locally installed Docker. """
+
         image = self.entry.image_id
 
         if self.entry.built_in:
@@ -151,9 +173,6 @@ class LocalSource(PackageSource):
             image = f'{self.entry.repository}:latest'
 
         return self.manifest_resolver.from_local(image)
-
-    def install_image(self, package: Package):
-        raise NotImplementedError
 
     def get_package(self) -> Package:
         return Package(self.entry, self.get_manifest())

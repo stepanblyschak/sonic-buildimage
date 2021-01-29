@@ -8,7 +8,9 @@
 service="{{ manifest.service.name }}"
 dump_command="{{ manifest.package['debug-dump'] }}"
 container_re="^${service}[0-9]*$"
+{% raw %}
 container_ids="$(docker ps -f name=${container_re} -f status=running --format {{.Names}})"
+{% endraw %}
 tmp_dir=$(mktemp -d)
 tmp_dump_dir="$tmp_dir/$service"
 tmp_archive=$(mktemp)

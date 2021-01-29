@@ -268,8 +268,8 @@ class PackageManager:
 
         try:
             with contextlib.ExitStack() as exit_stack:
-                source.install_image(package)
-                exit_stack.callback(rollback_wrapper(source.uninstall_image, package))
+                source.install(package)
+                exit_stack.callback(rollback_wrapper(source.uninstall, package))
 
                 self.service_creator.create(package, state=feature_state, owner=default_owner)
                 exit_stack.callback(rollback_wrapper(self.service_creator.remove, package))
@@ -333,6 +333,7 @@ class PackageManager:
                 self.docker.rm(container.id, force=True)
 
             self.docker.rmi(package.image_id, force=True)
+            package.entry.image_id = None
         except Exception as err:
             raise PackageUninstallationError(f'Failed to uninstall {package.name}: {err}')
 
@@ -429,8 +430,8 @@ class PackageManager:
                 self._uninstall_cli_plugins(old_package)
                 exit_stack.callback(rollback_wrapper(self._install_cli_plugins, old_package))
 
-                source.install_image(new_package)
-                exit_stack.callback(rollback_wrapper(source.uninstall_image, new_package))
+                source.install(new_package)
+                exit_stack.callback(rollback_wrapper(source.uninstall, new_package))
 
                 if self.feature_registry.is_feature_enabled(old_feature):
                     self._systemctl_action(old_package, 'stop')
