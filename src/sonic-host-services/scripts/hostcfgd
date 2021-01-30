@@ -589,9 +589,6 @@ class HostConfigDaemon:
         self.iptables.iptables_handler(key, data, add)
         self.ntpcfg.handle_ntp_source_intf_chg(key)
 
-    def feature_handler(self, key, data):
-        self.feature.handle(key, data)
-
     def ntp_server_handler (self, key, data):
         syslog.syslog(syslog.LOG_INFO, 'NTP server handler...')
         ntp_server_db = self.config_db.get_table('NTP_SERVER')
@@ -618,7 +615,7 @@ class HostConfigDaemon:
         self.config_db.subscribe('TACPLUS_SERVER', lambda table, key, data: self.tacacs_server_handler(key, data))
         self.config_db.subscribe('TACPLUS', lambda table, key, data: self.tacacs_global_handler(key, data))
         self.config_db.subscribe('LOOPBACK_INTERFACE', lambda table, key, data: self.lpbk_handler(key, data))
-        self.config_db.subscribe('FEATURE', lambda table, key, data: self.feature_handler(key, data))
+        self.config_db.subscribe('FEATURE', lambda table, key, data: self.feature.handle(key, data))
         self.config_db.subscribe('NTP_SERVER', lambda table, key, data: self.ntp_server_handler(key, data))
         self.config_db.subscribe('NTP', lambda table, key, data: self.ntp_global_handler(key, data))
         self.config_db.subscribe('KDUMP', lambda table, key, data: self.kdump_handler(key, data))
