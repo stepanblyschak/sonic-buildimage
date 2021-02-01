@@ -774,6 +774,10 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 			--build-arg frr_user_gid=$(FRR_USER_GID) \
 			--build-arg manifest="$$(cat $($*.gz_PATH)/manifest.json)" \
 			--build-arg image_version=$(SONIC_IMAGE_VERSION) \
+			--build-arg base_os_ver=$(BASE_OS_COMPATIBILITY_VERSION) \
+			--build-arg docker_database_version=$($(DOCKER_DATABASE)_VERSION) \
+			--build-arg docker_swss_version=$($(DOCKER_ORCHAGENT)_VERSION) \
+			--build-arg docker_syncd_version=$($(DOCKER_SYNCD_BASE)_VERSION) \
 			--label Tag=$(SONIC_IMAGE_VERSION) \
 			-t $* $($*.gz_PATH) $(LOG)
 		scripts/collect_docker_version_files.sh $* $(TARGET_PATH)
@@ -838,7 +842,8 @@ SONIC_TARGET_LIST += $(addprefix $(TARGET_PATH)/, $(DOCKER_DBG_IMAGES))
 
 DOCKER_LOAD_TARGETS = $(addsuffix -load,$(addprefix $(TARGET_PATH)/, \
 		      $(SONIC_SIMPLE_DOCKER_IMAGES) \
-		      $(DOCKER_IMAGES)))
+		      $(DOCKER_IMAGES) \
+			  $(DOCKER_DBG_IMAGES)))
 
 $(DOCKER_LOAD_TARGETS) : $(TARGET_PATH)/%.gz-load : .platform docker-start $$(TARGET_PATH)/$$*.gz
 	$(HEADER)
