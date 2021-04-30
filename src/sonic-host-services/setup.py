@@ -16,6 +16,7 @@ setup(
     scripts = [
         'scripts/caclmgrd',
         'scripts/hostcfgd',
+        'scripts/aaastatsd',
         'scripts/procdockerstatsd',
         'scripts/determine-reboot-cause',
         'scripts/process-reboot-cause',
@@ -35,6 +36,7 @@ setup(
     ],
     tests_require = [
         'pytest',
+        'sonic-py-common'
     ],
     classifiers = [
         'Development Status :: 3 - Alpha',

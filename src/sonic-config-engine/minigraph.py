@@ -456,6 +456,17 @@ def parse_dpg(dpg, hname):
             gwaddr = ipaddress.ip_address(next(mgmtipn.hosts()))
             mgmt_intf[(intfname, ipprefix)] = {'gwaddr': gwaddr}
 
+        voqinbandintfs = child.find(str(QName(ns, "VoqInbandInterfaces")))
+        voq_inband_intfs = {}
+        if voqinbandintfs:
+            for voqintf in voqinbandintfs.findall(str(QName(ns1, "VoqInbandInterface"))):
+                intfname = voqintf.find(str(QName(ns, "Name"))).text
+                intftype = voqintf.find(str(QName(ns, "Type"))).text
+                ipprefix = voqintf.find(str(QName(ns1, "PrefixStr"))).text
+                if intfname not in voq_inband_intfs:
+                   voq_inband_intfs[intfname] = {'inband_type': intftype}
+                voq_inband_intfs["%s|%s" % (intfname, ipprefix)] = {}
+
         pcintfs = child.find(str(QName(ns, "PortChannelInterfaces")))
         pc_intfs = []
         pcs = {}
@@ -606,7 +617,11 @@ def parse_dpg(dpg, hname):
                         if panel_port not in intfs_inpc and panel_port not in acl_intfs:
                             acl_intfs.append(panel_port)
                     break
-            if acl_intfs:
+            # if acl is classified as mirror (erpsan) or acl interface 
+            # are binded then do not classify as Control plane.
+            # For multi-asic platforms it's possible there is no
+            # interface are binded to everflow in host namespace.
+            if acl_intfs or is_mirror_v6 or is_mirror:
                 # Remove duplications
                 dedup_intfs = []
                 for intf in acl_intfs:
@@ -663,8 +678,8 @@ def parse_dpg(dpg, hname):
                     if mg_key in mg_tunnel.attrib:
                         tunnelintfs[tunnel_type][tunnel_name][table_key] = mg_tunnel.attrib[mg_key]
 
-        return intfs, lo_intfs, mvrf, mgmt_intf, vlans, vlan_members, pcs, pc_members, acls, vni, tunnelintfs, dpg_ecmp_content
-    return None, None, None, None, None, None, None, None, None, None
+        return intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, pcs, pc_members, acls, vni, tunnelintfs, dpg_ecmp_content
+    return None, None, None, None, None, None, None, None, None, None, None, None, None
 
 def parse_host_loopback(dpg, hname):
     for child in dpg:
@@ -677,6 +692,7 @@ def parse_host_loopback(dpg, hname):
 def parse_cpg(cpg, hname, local_devices=[]):
     bgp_sessions = {}
     bgp_internal_sessions = {}
+    bgp_voq_chassis_sessions = {}
     myasn = None
     bgp_peers_with_range = {}
     for child in cpg:
@@ -698,46 +714,40 @@ def parse_cpg(cpg, hname, local_devices=[]):
                     keepalive = 60
                 nhopself = 1 if session.find(str(QName(ns, "NextHopSelf"))) is not None else 0
 
+                # choose the right table and admin_status for the peer
+                voq_chassis = session.find(str(QName(ns, "VoQChassisInternal")))
+                if voq_chassis is not None and voq_chassis.text == "true":
+                    table = bgp_voq_chassis_sessions
+                    admin_status = 'up'
+                elif end_router.lower() in local_devices and start_router.lower() in local_devices:
+                    table = bgp_internal_sessions
+                    admin_status = 'up'
+                else:
+                    table = bgp_sessions
+                    admin_status = None
+
                 if end_router.lower() == hname.lower():
-                    if end_router.lower() in local_devices and start_router.lower() in local_devices:
-                        bgp_internal_sessions[start_peer.lower()] = {
-                            'name': start_router,
-                            'local_addr': end_peer.lower(),
-                            'rrclient': rrclient,
-                            'holdtime': holdtime,
-                            'keepalive': keepalive,
-                            'nhopself': nhopself,
-                            'admin_status': 'up'
-                        }
-                    else:
-                        bgp_sessions[start_peer.lower()] = {
-                            'name': start_router,
-                            'local_addr': end_peer.lower(),
-                            'rrclient': rrclient,
-                            'holdtime': holdtime,
-                            'keepalive': keepalive,
-                            'nhopself': nhopself
-                        }
+                    table[start_peer.lower()] = {
+                        'name': start_router,
+                        'local_addr': end_peer.lower(),
+                        'rrclient': rrclient,
+                        'holdtime': holdtime,
+                        'keepalive': keepalive,
+                        'nhopself': nhopself
+                    }
+                    if admin_status:
+                        table[start_peer.lower()]['admin_status'] = admin_status
                 elif start_router.lower() == hname.lower():
-                    if end_router.lower() in local_devices and start_router.lower() in local_devices:
-                        bgp_internal_sessions[end_peer.lower()] = {
-                            'name': end_router,
-                            'local_addr': start_peer.lower(),
-                            'rrclient': rrclient,
-                            'holdtime': holdtime,
-                            'keepalive': keepalive,
-                            'nhopself': nhopself,
-                            'admin_status': 'up'
-                        }
-                    else:
-                        bgp_sessions[end_peer.lower()] = {
-                            'name': end_router,
-                            'local_addr': start_peer.lower(),
-                            'rrclient': rrclient,
-                            'holdtime': holdtime,
-                            'keepalive': keepalive,
-                            'nhopself': nhopself
-                        }
+                    table[end_peer.lower()] = {
+                        'name': end_router,
+                        'local_addr': start_peer.lower(),
+                        'rrclient': rrclient,
+                        'holdtime': holdtime,
+                        'keepalive': keepalive,
+                        'nhopself': nhopself
+                    }
+                    if admin_status:
+                        table[end_peer.lower()]['admin_status'] = admin_status
         elif child.tag == str(QName(ns, "Routers")):
             for router in child.findall(str(QName(ns1, "BGPRouterDeclaration"))):
                 asn = router.find(str(QName(ns1, "ASN"))).text
@@ -768,12 +778,19 @@ def parse_cpg(cpg, hname, local_devices=[]):
                         bgp_internal_session = bgp_internal_sessions[peer]
                         if hostname.lower() == bgp_internal_session['name'].lower():
                             bgp_internal_session['asn'] = asn
+                    for peer in bgp_voq_chassis_sessions:
+                        bgp_session = bgp_voq_chassis_sessions[peer]
+                        if hostname.lower() == bgp_session['name'].lower():
+                            bgp_session['asn'] = asn
 
     bgp_monitors = { key: bgp_sessions[key] for key in bgp_sessions if 'asn' in bgp_sessions[key] and bgp_sessions[key]['name'] == 'BGPMonitor' }
-    bgp_sessions = { key: bgp_sessions[key] for key in bgp_sessions if 'asn' in bgp_sessions[key] and int(bgp_sessions[key]['asn']) != 0 }
-    bgp_internal_sessions = { key: bgp_internal_sessions[key] for key in bgp_internal_sessions if 'asn' in bgp_internal_sessions[key] and int(bgp_internal_sessions[key]['asn']) != 0 }
+    def filter_bad_asn(table):
+        return { key: table[key] for key in table if 'asn' in table[key] and int(table[key]['asn']) != 0 }
+    bgp_sessions = filter_bad_asn(bgp_sessions)
+    bgp_internal_sessions = filter_bad_asn(bgp_internal_sessions)
+    bgp_voq_chassis_sessions = filter_bad_asn(bgp_voq_chassis_sessions)
 
-    return bgp_sessions, bgp_internal_sessions, myasn, bgp_peers_with_range, bgp_monitors
+    return bgp_sessions, bgp_internal_sessions, bgp_voq_chassis_sessions, myasn, bgp_peers_with_range, bgp_monitors
 
 
 def parse_meta(meta, hname):
@@ -787,6 +804,10 @@ def parse_meta(meta, hname):
     region = None
     cloudtype = None
     resource_type = None
+    downstream_subrole = None
+    switch_id = None
+    switch_type = None
+    max_cores = None
     kube_data = {}
     device_metas = meta.find(str(QName(ns, "Devices")))
     for device in device_metas.findall(str(QName(ns1, "DeviceMetadata"))):
@@ -816,11 +837,19 @@ def parse_meta(meta, hname):
                     cloudtype = value
                 elif name == "ResourceType":
                     resource_type = value
+                elif name == "DownStreamSubRole":
+                    downstream_subrole = value
+                elif name == "SwitchId":
+                    switch_id = value
+                elif name == "SwitchType":
+                    switch_type = value
+                elif name == "MaxCores":
+                    max_cores = value
                 elif name == "KubernetesEnabled":
                     kube_data["enable"] = value
                 elif name == "KubernetesServerIp":
                     kube_data["ip"] = value
-    return syslog_servers, dhcp_servers, ntp_servers, tacacs_servers, mgmt_routes, erspan_dst, deployment_id, region, cloudtype, resource_type, kube_data
+    return syslog_servers, dhcp_servers, ntp_servers, tacacs_servers, mgmt_routes, erspan_dst, deployment_id, region, cloudtype, resource_type, downstream_subrole, switch_id, switch_type, max_cores, kube_data
 
 
 def parse_linkmeta(meta, hname):
@@ -877,6 +906,9 @@ def parse_linkmeta(meta, hname):
 
 def parse_asic_meta(meta, hname):
     sub_role = None
+    switch_id = None
+    switch_type = None
+    max_cores = None
     device_metas = meta.find(str(QName(ns, "Devices")))
     for device in device_metas.findall(str(QName(ns1, "DeviceMetadata"))):
         if device.find(str(QName(ns1, "Name"))).text.lower() == hname.lower():
@@ -886,7 +918,13 @@ def parse_asic_meta(meta, hname):
                 value = device_property.find(str(QName(ns1, "Value"))).text
                 if name == "SubRole":
                     sub_role = value
-    return sub_role
+                elif name == "SwitchId":
+                    switch_id = value
+                elif name == "SwitchType":
+                    switch_type = value
+                elif name == "MaxCores":
+                    max_cores = value
+    return sub_role, switch_id, switch_type, max_cores
 
 def parse_deviceinfo(meta, hwsku):
     port_speeds = {}
@@ -903,7 +941,28 @@ def parse_deviceinfo(meta, hwsku):
                 if desc != None:
                     port_descriptions[port_alias_map.get(alias, alias)] = desc.text
                 port_speeds[port_alias_map.get(alias, alias)] = speed
-    return port_speeds, port_descriptions
+
+            sysports = device_info.find(str(QName(ns, "SystemPorts")))
+            sys_ports = {}
+            if sysports is not None:
+                for sysport in sysports.findall(str(QName(ns, "SystemPort"))):
+                    portname = sysport.find(str(QName(ns, "Name"))).text
+                    hostname = sysport.find(str(QName(ns, "Hostname")))
+                    asic_name = sysport.find(str(QName(ns, "AsicName")))
+                    system_port_id = sysport.find(str(QName(ns, "SystemPortId"))).text
+                    switch_id = sysport.find(str(QName(ns, "SwitchId"))).text
+                    core_id = sysport.find(str(QName(ns, "CoreId"))).text
+                    core_port_id = sysport.find(str(QName(ns, "CorePortId"))).text
+                    speed = sysport.find(str(QName(ns, "Speed"))).text
+                    num_voq = sysport.find(str(QName(ns, "NumVoq"))).text
+                    key = portname
+                    if asic_name is not None:
+                       key = "%s|%s" % (asic_name.text, key)
+                    if hostname is not None:
+                       key = "%s|%s" % (hostname.text, key)
+                    sys_ports[key] = {"system_port_id": system_port_id, "switch_id": switch_id, "core_index": core_id, "core_port_index": core_port_id, "speed": speed, "num_voq": num_voq}
+
+    return port_speeds, port_descriptions, sys_ports
 
 # Function to check if IP address is present in the key. 
 # If it is present, then the key would be a tuple.
@@ -1088,15 +1147,18 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
     vlan_members = None
     pcs = None
     mgmt_intf = None
+    voq_inband_intfs = None
     lo_intfs = None
     neighbors = None
     devices = None
     sub_role = None
     resource_type = None
+    downstream_subrole = None
     docker_routing_config_mode = "separated"
     port_speeds_default = {}
     port_speed_png = {}
     port_descriptions = {}
+    sys_ports = {}
     console_ports = {}
     mux_cable_ports = {}
     syslog_servers = []
@@ -1109,6 +1171,9 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
     deployment_id = None
     region = None
     cloudtype = None
+    switch_id = None
+    switch_type = None
+    max_cores = None
     hostname = None
     linkmetas = {}
     host_lo_intfs = None
@@ -1143,33 +1208,33 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
     for child in root:
         if asic_name is None:
             if child.tag == str(QName(ns, "DpgDec")):
-                (intfs, lo_intfs, mvrf, mgmt_intf, vlans, vlan_members, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, hostname)
+                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, hostname)
             elif child.tag == str(QName(ns, "CpgDec")):
-                (bgp_sessions, bgp_internal_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, hostname)
+                (bgp_sessions, bgp_internal_sessions, bgp_voq_chassis_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, hostname)
             elif child.tag == str(QName(ns, "PngDec")):
                 (neighbors, devices, console_dev, console_port, mgmt_dev, mgmt_port, port_speed_png, console_ports, mux_cable_ports, is_storage_device, png_ecmp_content) = parse_png(child, hostname, dpg_ecmp_content)
             elif child.tag == str(QName(ns, "UngDec")):
                 (u_neighbors, u_devices, _, _, _, _, _, _) = parse_png(child, hostname, None)
             elif child.tag == str(QName(ns, "MetadataDeclaration")):
-                (syslog_servers, dhcp_servers, ntp_servers, tacacs_servers, mgmt_routes, erspan_dst, deployment_id, region, cloudtype, resource_type, kube_data) = parse_meta(child, hostname)
+                (syslog_servers, dhcp_servers, ntp_servers, tacacs_servers, mgmt_routes, erspan_dst, deployment_id, region, cloudtype, resource_type, downstream_subrole, switch_id, switch_type, max_cores, kube_data) = parse_meta(child, hostname)
             elif child.tag == str(QName(ns, "LinkMetadataDeclaration")):
                 linkmetas = parse_linkmeta(child, hostname)
             elif child.tag == str(QName(ns, "DeviceInfos")):
-                (port_speeds_default, port_descriptions) = parse_deviceinfo(child, hwsku)
+                (port_speeds_default, port_descriptions, sys_ports) = parse_deviceinfo(child, hwsku)
         else:
             if child.tag == str(QName(ns, "DpgDec")):
-                (intfs, lo_intfs, mvrf, mgmt_intf, vlans, vlan_members, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, asic_name)
+                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, asic_name)
                 host_lo_intfs = parse_host_loopback(child, hostname)
             elif child.tag == str(QName(ns, "CpgDec")):
-                (bgp_sessions, bgp_internal_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, asic_name, local_devices)
+                (bgp_sessions, bgp_internal_sessions, bgp_voq_chassis_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, asic_name, local_devices)
             elif child.tag == str(QName(ns, "PngDec")):
                 (neighbors, devices, port_speed_png) = parse_asic_png(child, asic_name, hostname)
             elif child.tag == str(QName(ns, "MetadataDeclaration")):
-                (sub_role) = parse_asic_meta(child, asic_name)
+                (sub_role, switch_id, switch_type, max_cores ) = parse_asic_meta(child, asic_name)
             elif child.tag == str(QName(ns, "LinkMetadataDeclaration")):
                 linkmetas = parse_linkmeta(child, hostname)
             elif child.tag == str(QName(ns, "DeviceInfos")):
-                (port_speeds_default, port_descriptions) = parse_deviceinfo(child, hwsku)
+                (port_speeds_default, port_descriptions, sys_ports) = parse_deviceinfo(child, hwsku)
 
     # set the host device type in asic metadata also
     device_type = [devices[key]['type'] for key in devices if key.lower() == hostname.lower()][0]
@@ -1222,14 +1287,38 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
         current_device['sub_role'] = sub_role
         results['DEVICE_METADATA']['localhost']['sub_role'] =  sub_role
         results['DEVICE_METADATA']['localhost']['asic_name'] =  asic_name
+    elif switch_type == "voq":
+       # On Voq switches asic_name is mandatory even on single-asic devices
+       results['DEVICE_METADATA']['localhost']['asic_name'] = 'Asic0'
+
+    # on Voq system each asic has a switch_id
+    if switch_id is not None:
+        results['DEVICE_METADATA']['localhost']['switch_id'] = switch_id
+    # on Voq system each asic has a switch_type
+    if switch_type is not None:
+        results['DEVICE_METADATA']['localhost']['switch_type'] = switch_type
+    # on Voq system each asic has a max_cores
+    if max_cores is not None:
+        results['DEVICE_METADATA']['localhost']['max_cores'] = max_cores
+
+    # Voq systems have an inband interface
+    if voq_inband_intfs is not None:
+        results['VOQ_INBAND_INTERFACE'] = {}
+        for key in voq_inband_intfs:
+           results['VOQ_INBAND_INTERFACE'][key] = voq_inband_intfs[key]
+
 
     if resource_type is not None:
         results['DEVICE_METADATA']['localhost']['resource_type'] = resource_type
+
+    if downstream_subrole is not None:
+        results['DEVICE_METADATA']['localhost']['downstream_subrole'] = downstream_subrole
 
     results['BGP_NEIGHBOR'] = bgp_sessions
     results['BGP_MONITORS'] = bgp_monitors
     results['BGP_PEER_RANGE'] = bgp_peers_with_range
     results['BGP_INTERNAL_NEIGHBOR'] = bgp_internal_sessions
+    results['BGP_VOQ_CHASSIS_NEIGHBOR'] = bgp_voq_chassis_sessions
     if mgmt_routes:
         # TODO: differentiate v4 and v6
         next(iter(mgmt_intf.values()))['forced_mgmt_routes'] = mgmt_routes
@@ -1297,6 +1386,9 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
 
     results['INTERFACE'] = phyport_intfs
     results['VLAN_INTERFACE'] = vlan_intfs
+
+    if sys_ports:
+       results['SYSTEM_PORT'] = sys_ports
 
     for port_name in port_speeds_default:
         # ignore port not in port_config.ini
@@ -1583,7 +1675,7 @@ def parse_asic_sub_role(filename, asic_name):
     root = ET.parse(filename).getroot()
     for child in root:
         if child.tag == str(QName(ns, "MetadataDeclaration")):
-            sub_role = parse_asic_meta(child, asic_name)
+            sub_role, _, _, _ = parse_asic_meta(child, asic_name)
             return sub_role
 
 def parse_asic_meta_get_devices(root):

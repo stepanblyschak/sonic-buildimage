@@ -21,6 +21,7 @@ class TestCfgGen(TestCase):
         self.sample_graph_metadata = os.path.join(self.test_dir, 'simple-sample-graph-metadata.xml')
         self.sample_graph_pc_test = os.path.join(self.test_dir, 'pc-test-graph.xml')
         self.sample_graph_bgp_speaker = os.path.join(self.test_dir, 't0-sample-bgp-speaker.xml')
+        self.sample_graph_voq = os.path.join(self.test_dir, 'sample-voq-graph.xml')
         self.sample_device_desc = os.path.join(self.test_dir, 'device.xml')
         self.port_config = os.path.join(self.test_dir, 't0-sample-port-config.ini')
         self.port_config_autoneg = os.path.join(self.test_dir, 't0-sample-autoneg-port-config.ini')
@@ -68,6 +69,11 @@ class TestCfgGen(TestCase):
         output = self.run_script(argument)
         self.assertEqual(output.strip(), "('eth0', '10.0.1.5/28')")
 
+    def test_minigraph_hostname(self):
+        argument = '-v "DEVICE_METADATA[\'localhost\'][\'hostname\']" -m "' + self.sample_graph + '"'
+        output = self.run_script(argument)
+        self.assertEqual(output.strip(), 'OCPSCH01040DDLF')
+
     def test_minigraph_sku(self):
         argument = '-v "DEVICE_METADATA[\'localhost\'][\'hwsku\']" -m "' + self.sample_graph + '"'
         output = self.run_script(argument)
@@ -87,6 +93,11 @@ class TestCfgGen(TestCase):
         argument = '-v "DEVICE_METADATA[\'localhost\'][\'resource_type\']" -m "' + self.sample_graph_metadata + '"'
         output = self.run_script(argument)
         self.assertEqual(output.strip(), 'resource_type_x')
+
+    def test_minigraph_downstream_subrole(self):
+        argument = '-v "DEVICE_METADATA[\'localhost\'][\'downstream_subrole\']" -m "' + self.sample_graph_metadata + '"'
+        output = self.run_script(argument)
+        self.assertEqual(output.strip(), 'downstream_subrole_y')
 
     def test_print_data(self):
         argument = '-m "' + self.sample_graph + '" --print-data'
@@ -581,6 +592,19 @@ class TestCfgGen(TestCase):
             utils.to_dict("{'10.20.30.40': {'rrclient': 0, 'name': 'BGPMonitor', 'local_addr': '10.1.0.32', 'nhopself': 0, 'holdtime': '10', 'asn': '0', 'keepalive': '3'}}")
         )
 
+    def test_minigraph_bgp_voq_chassis_peer(self):
+        argument = '-m "' + self.sample_graph_simple + '" -p "' + self.port_config + '" -v "BGP_VOQ_CHASSIS_NEIGHBOR[\'10.2.0.21\']"'
+        output = self.run_script(argument)
+        self.assertEqual(
+            utils.to_dict(output.strip()),
+            utils.to_dict("{'rrclient': 0, 'name': 'CHASSIS_PEER', 'local_addr': '10.2.0.20', 'nhopself': 0, 'holdtime': '180', 'asn': '65100', 'keepalive': '60', 'admin_status': 'up'}")
+        )
+
+        # make sure VoQChassisInternal value of false is honored
+        argument = '-m "' + self.sample_graph_simple + '" -p "' + self.port_config + '" -v "BGP_VOQ_CHASSIS_NEIGHBOR[\'10.0.0.57\']"'
+        output = self.run_script(argument)
+        self.assertEqual(output.strip(), "")
+
     def test_minigraph_sub_port_interfaces(self, check_stderr=True):
         try:
             print('\n    Change device type to %s' % (BACKEND_TOR_ROUTER))
@@ -647,3 +671,39 @@ class TestCfgGen(TestCase):
         argument = '-a \'{"key1":"value"}\' --var-json INTERFACE'
         output = self.run_script(argument)
         self.assertEqual(output, '')
+
+    def test_minigraph_voq_metadata(self):
+        argument = "-m {} --var-json DEVICE_METADATA".format(self.sample_graph_voq)
+        output = json.loads(self.run_script(argument))
+        self.assertEqual(output['localhost']['asic_name'], 'Asic0')
+        self.assertEqual(output['localhost']['switch_id'], '0')
+        self.assertEqual(output['localhost']['switch_type'], 'voq')
+        self.assertEqual(output['localhost']['max_cores'], '16')
+
+    def test_minigraph_voq_system_ports(self):
+        argument = "-m {} --var-json SYSTEM_PORT".format(self.sample_graph_voq)
+        self.assertDictEqual(
+            json.loads(self.run_script(argument)),
+            {
+                "linecard-1|Asic0|Cpu0": { "core_port_index": "0", "num_voq": "8", "switch_id": "0", "speed": "1000", "core_index": "0", "system_port_id": "1" },
+                "linecard-1|Asic0|Ethernet1/1": { "core_port_index": "1", "num_voq": "8", "switch_id": "0", "speed": "40000", "core_index": "0", "system_port_id": "2" },
+                "linecard-1|Asic0|Ethernet1/2": { "core_port_index": "2", "num_voq": "8", "switch_id": "0", "speed": "40000", "core_index": "0", "system_port_id": "3" },
+                "linecard-1|Asic0|Ethernet1/3": { "core_port_index": "3", "num_voq": "8", "switch_id": "0", "speed": "40000", "core_index": "1", "system_port_id": "4" },
+                "linecard-1|Asic0|Ethernet1/4": { "core_port_index": "4", "num_voq": "8", "switch_id": "0", "speed": "40000", "core_index": "1", "system_port_id": "5" },
+                "linecard-2|Asic0|Cpu0": { "core_port_index": "0", "num_voq": "8", "switch_id": "2", "speed": "1000", "core_index": "0", "system_port_id": "256" },
+                "linecard-2|Asic0|Ethernet1/5": { "core_port_index": "1", "num_voq": "8", "switch_id": "2", "speed": "40000", "core_index": "0", "system_port_id": "257" },
+                "linecard-2|Asic0|Ethernet1/6": { "core_port_index": "2", "num_voq": "8", "switch_id": "2", "speed": "40000", "core_index": "1", "system_port_id": "258" },
+                "linecard-2|Asic1|Cpu0": { "core_port_index": "0", "num_voq": "8", "switch_id": "4", "speed": "1000", "core_index": "0", "system_port_id": "259" },
+                "linecard-2|Asic1|Ethernet1/7": { "core_port_index": "1", "num_voq": "8", "switch_id": "4", "speed": "40000", "core_index": "0", "system_port_id": "260" },
+                "linecard-2|Asic1|Ethernet1/8": { "core_port_index": "2", "num_voq": "8", "switch_id": "4", "speed": "40000", "core_index": "1", "system_port_id": "261" }
+            }
+        )
+
+    def test_minigraph_voq_inband_interface(self):
+        argument = "-m {} --var-json VOQ_INBAND_INTERFACE".format(self.sample_graph_voq)
+        self.assertDictEqual(
+            json.loads(self.run_script(argument)),
+            { 'Vlan3094': {'inband_type': 'Vlan'},
+              'Vlan3094|1.1.1.1/24': {}
+            }
+        )

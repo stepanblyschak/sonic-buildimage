@@ -21,6 +21,12 @@ PLATFORM_DIR=$2
     exit 1
 }
 
+IMAGE_DISTRO=$3
+[ -n "$IMAGE_DISTRO" ] || {
+    echo "Error: no or empty IMAGE_DISTRO argument"
+    exit 1
+}
+
 ## Enable debug output for script
 set -x -e
 
@@ -61,7 +67,7 @@ sudo bash -c "echo \"DOCKER_OPTS=\"--storage-driver=overlay2\"\" >> $FILESYSTEM_
 # Copy docker start script to be able to start docker in chroot
 sudo mkdir -p "$FILESYSTEM_ROOT/$DOCKER_CTL_DIR"
 sudo cp $DOCKER_SCRIPTS_DIR/docker "$FILESYSTEM_ROOT/$DOCKER_CTL_SCRIPT"
-if [[ $CONFIGURED_ARCH == armhf || $CONFIGURED_ARCH == arm64 ]]; then
+if [ $MULTIARCH_QEMU_ENVIRON == y ]; then
     SONIC_NATIVE_DOCKERD_FOR_DOCKERFS=" -H unix:///dockerfs/var/run/docker.sock "
     SONIC_NATIVE_DOCKERD_FOR_DOCKERFS_PID="cat `pwd`/dockerfs/var/run/docker.pid"
 else
@@ -255,10 +261,12 @@ sudo cp -f $IMAGE_CONFIGS/bash/bash.bashrc $FILESYSTEM_ROOT/etc/
 
 # Install prerequisites needed for installing the dependent Python packages of sonic-host-services
 # These packages can be uninstalled after installation
-sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install libcairo2-dev libdbus-1-dev libgirepository1.0-dev libsystemd-dev pkg-config
+sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install libcairo2-dev libdbus-1-dev libgirepository1.0-dev pkg-config
+sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y -t $IMAGE_DISTRO-backports install libsystemd-dev
 
 # Manually install runtime dependencies to avoid them being auto-removed while uninstalling build dependencies
-sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install gir1.2-glib-2.0 libdbus-1-3 libgirepository-1.0-1 libsystemd0
+sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install gir1.2-glib-2.0 libdbus-1-3 libgirepository-1.0-1
+sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y -t $IMAGE_DISTRO-backports install libsystemd0
 
 # Install SONiC host services package
 SONIC_HOST_SERVICES_PY3_WHEEL_NAME=$(basename {{sonic_host_services_py3_wheel_path}})
@@ -290,6 +298,16 @@ sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/libnss-tacplus_*.deb || \
 # Disable tacplus by default
 sudo LANG=C chroot $FILESYSTEM_ROOT pam-auth-update --remove tacplus
 sudo sed -i -e '/^passwd/s/ tacplus//' $FILESYSTEM_ROOT/etc/nsswitch.conf
+
+# Install pam-radius-auth and nss-radius
+sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/libpam-radius-auth_*.deb || \
+    sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
+sudo dpkg --root=$FILESYSTEM_ROOT -i $debs_path/libnss-radius_*.deb || \
+    sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT apt-get -y install -f
+# Disable radius by default
+# radius does not have any profiles
+#sudo LANG=C chroot $FILESYSTEM_ROOT pam-auth-update --remove radius tacplus
+sudo sed -i -e '/^passwd/s/ radius//' $FILESYSTEM_ROOT/etc/nsswitch.conf
 
 # Install a custom version of kdump-tools  (and its dependencies via 'apt-get -y install -f')
 if [[ $CONFIGURED_ARCH == amd64 ]]; then
@@ -387,6 +405,9 @@ sudo cp files/dhcp/90-dhcp6-systcl.conf.j2 $FILESYSTEM_ROOT_USR_SHARE_SONIC_TEMP
 # Copy initial interfaces configuration file, will be overwritten on first boot
 sudo cp $IMAGE_CONFIGS/interfaces/init_interfaces $FILESYSTEM_ROOT/etc/network/interfaces
 sudo mkdir -p $FILESYSTEM_ROOT/etc/network/interfaces.d
+
+# System'd network udev rules
+sudo cp $IMAGE_CONFIGS/systemd/network/* $FILESYSTEM_ROOT_ETC/systemd/network/
 
 # copy core file uploader files
 sudo cp $IMAGE_CONFIGS/corefile_uploader/core_uploader.service $FILESYSTEM_ROOT_USR_LIB_SYSTEMD_SYSTEM
@@ -583,7 +604,7 @@ EOF
 {% endif %}
 
 ## Bind docker path
-if [[ $CONFIGURED_ARCH == armhf || $CONFIGURED_ARCH == arm64 ]]; then
+if [ $MULTIARCH_QEMU_ENVIRON == y ]; then
     sudo mkdir -p $FILESYSTEM_ROOT/dockerfs
     sudo mount --bind dockerfs $FILESYSTEM_ROOT/dockerfs
 fi
@@ -597,17 +618,31 @@ sudo mount proc /proc -t proc
 sudo mkdir $FILESYSTEM_ROOT/target
 sudo mount --bind target $FILESYSTEM_ROOT/target
 sudo chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS info
-{% for image in installer_images.strip().split(' ') -%}
-{% set imagefilename = image.split('/')|last -%}
+
+{% for docker_installation_target in installer_images.strip().split() -%}
+{% set pkgname, docker_build_path, image = docker_installation_target.split('|') %}
+{% set imagefilepath = image.split(':')|first -%}
+{% set imagefilename = imagefilepath.split('/')|last -%}
 {% set imagename = imagefilename.split('.')|first -%}
-sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS load -i {{image}}
+sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS load -i {{imagefilepath}}
 sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS tag {{imagename}}:latest {{imagename}}:"${SONIC_IMAGE_VERSION}"
+# Check if manifest exists for {{imagename}} and it is a valid JSON
+sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS inspect {{imagename}}:latest \
+    | jq '.[0].Config.Labels["com.azure.sonic.manifest"]' -r > /tmp/manifest.json
+jq -e . /tmp/manifest.json || {
+    >&2 echo "docker image {{imagename}} has no manifest or manifest is not a valid JSON"
+    exit 1
+}
 {% if imagename.endswith('-dbg') %}
 {% set imagebasename = imagename.replace('-dbg', '') -%}
 sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS tag {{imagename}}:latest {{imagebasename}}:"${SONIC_IMAGE_VERSION}"
 sudo LANG=C chroot $FILESYSTEM_ROOT docker $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS tag {{imagename}}:latest {{imagebasename}}:latest
 {% endif %}
 {% endfor %}
+
+SONIC_PACKAGE_MANAGER_FOLDER="/var/lib/sonic-package-manager/"
+sudo mkdir -p $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_FOLDER
+j2 $BUILD_TEMPLATES/packages.json.j2 | sudo tee $FILESYSTEM_ROOT/$SONIC_PACKAGE_MANAGER_FOLDER/packages.json
 
 # Copy docker_image_ctl.j2 for SONiC Package Manager
 sudo cp $BUILD_TEMPLATES/docker_image_ctl.j2 $FILESYSTEM_ROOT_USR_SHARE_SONIC_TEMPLATES/docker_image_ctl.j2
@@ -621,7 +656,7 @@ echo "docker images pull complete"
 
 sudo umount $FILESYSTEM_ROOT/target
 sudo rm -r $FILESYSTEM_ROOT/target
-if [[ $CONFIGURED_ARCH == armhf || $CONFIGURED_ARCH == arm64 ]]; then
+if [ $MULTIARCH_QEMU_ENVIRON == y ]; then
     sudo umount $FILESYSTEM_ROOT/dockerfs
     sudo rm -fr $FILESYSTEM_ROOT/dockerfs
     sudo kill -9 `sudo $SONIC_NATIVE_DOCKERD_FOR_DOCKERFS_PID` || true
