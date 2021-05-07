@@ -36,6 +36,7 @@ setup(
     ],
     tests_require = [
         'pytest',
+        'pyfakefs',
         'sonic-py-common'
     ],
     classifiers = [
