@@ -1,6 +1,6 @@
 {
 {% for docker_installation_target in installer_images.strip().split() -%}
-{% set pkgname, docker_build_path, image = docker_installation_target.split('|') -%}
+{% set pkgname, docker_build_path, _, image = docker_installation_target.split('|') -%}
 {% set imagefilepath = image.split(':')|first -%}
 {% set imageversion = image.split(':')|last -%}
 {% set imagefilename = imagefilepath.split('/')|last -%}
