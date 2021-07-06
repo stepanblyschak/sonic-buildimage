@@ -705,6 +705,13 @@ sudo LANG=C chroot $FILESYSTEM_ROOT sonic-package-manager install {{ name }}=={{
 sudo LANG=C chroot $FILESYSTEM_ROOT sonic-package-manager install --from-tarball {{ path }} {{ get_install_options(set_owner, enabled) }}
 {% endfor -%}
 
+{% if install_third_party_debs -%}
+TEMP_DIR="$(sudo LANG=C chroot $FILESYSTEM_ROOT mktemp -d)"
+sudo wget {{ install_third_party_debs.strip().replace(",", " ") }} --directory-prefix="$FILESYSTEM_ROOT/$TEMP_DIR"
+sudo LANG=C DEBIAN_FRONTEND=noninteractive chroot $FILESYSTEM_ROOT bash -c "apt-get install -y $TEMP_DIR/*"
+sudo rm -rf "$FILESYSTEM_ROOT/$TEMP_DIR"
+{% endif -%}
+
 sudo umount $FILESYSTEM_ROOT/target
 sudo rm -r $FILESYSTEM_ROOT/target
 if [ $MULTIARCH_QEMU_ENVIRON == y ]; then

@@ -274,6 +274,7 @@ SONIC_BUILD_INSTRUCTION :=  make \
                            BUILD_LOG_TIMESTAMP=$(BUILD_LOG_TIMESTAMP) \
                            SONIC_ENABLE_IMAGE_SIGNATURE=$(ENABLE_IMAGE_SIGNATURE) \
                            ENABLE_HOST_SERVICE_ON_START=$(ENABLE_HOST_SERVICE_ON_START) \
+                           INSTALL_THIRD_PARTY_DEBS=$(INSTALL_THIRD_PARTY_DEBS) \
                            SLAVE_DIR=$(SLAVE_DIR) \
                            $(SONIC_OVERRIDE_BUILD_VARS)
 

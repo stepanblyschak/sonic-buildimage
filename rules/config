@@ -189,3 +189,8 @@ SONIC_VERSION_CONTROL_COMPONENTS ?= none
 # ENABLE_DOCKER_BASE_PULL = y
 REGISTRY_PORT=443
 REGISTRY_SERVER=sonicdev-microsoft.azurecr.io
+
+# This variable is used to install 3rd party debian packages in base SONiC OS.
+# A comma-seperated list of URLs to fetch debian packages from is expected.
+# NOTE: debian packages are installed in the order they are defined.
+INSTALL_THIRD_PARTY_DEBS ?= ""
