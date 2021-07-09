@@ -256,6 +256,7 @@ $(info "ENABLE_HOST_SERVICE_ON_START"    : "$(ENABLE_HOST_SERVICE_ON_START)")
 $(info "INCLUDE_RESTAPI"                 : "$(INCLUDE_RESTAPI)")
 $(info "INCLUDE_SFLOW"                   : "$(INCLUDE_SFLOW)")
 $(info "INCLUDE_NAT"                     : "$(INCLUDE_NAT)")
+$(info "INCLUDE_DHCP_RELAY"              : "$(INCLUDE_DHCP_RELAY)")
 $(info "INCLUDE_KUBERNETES"              : "$(INCLUDE_KUBERNETES)")
 $(info "INCLUDE_MACSEC"                  : "$(INCLUDE_MACSEC)")
 $(info "TELEMETRY_WRITABLE"              : "$(TELEMETRY_WRITABLE)")
@@ -726,6 +727,9 @@ $(addprefix $(TARGET_PATH)/, $(DOCKER_IMAGES)) : $(TARGET_PATH)/%.gz : .platform
 		$$(addsuffix -install,$$(addprefix $(PYTHON_WHEELS_PATH)/,$$($$*.gz_INSTALL_PYTHON_WHEELS))) \
 		$$(addsuffix -install,$$(addprefix $(DEBS_PATH)/,$$($$*.gz_INSTALL_DEBS))) \
 		$$($$*.gz_PATH)/Dockerfile.j2 \
+        $(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_UTILITIES_PY3)-install) \
+		$(addprefix $(PYTHON_WHEELS_PATH)/,$(SONIC_UTILITIES_PY3)-install) \
+		$(addprefix $(DEBS_PATH)/,$(PYTHON3_SWSSCOMMON)-install) \
 		$(call dpkg_depend,$(TARGET_PATH)/%.gz.dep)
 	$(HEADER)
 
