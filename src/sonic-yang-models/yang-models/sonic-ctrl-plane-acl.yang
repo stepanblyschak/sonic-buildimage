@@ -1,0 +1,126 @@
+module sonic-ctrl-plane-acl {
+
+	yang-version 1.1;
+
+	namespace "http://github.com/Azure/sonic-acl-ctrl-plane-acl";
+	prefix ctrl-plane-acl;
+
+	import ietf-inet-types {
+		prefix inet;
+	}
+
+	import sonic-types {
+		prefix stypes;
+		revision-date 2019-07-01;
+	}
+
+	description "Control Plane ACL YANG Module for SONiC OS";
+
+	revision 2021-10-10 {
+		description "First Revision";
+	}
+
+	container sonic-ctrl-plane-acl {
+
+		container CTRL_PLANE_ACL_RULE {
+
+			description "CTRL_PLANE_ACL_RULE part of config_db.json";
+
+			list CTRL_PLANE_ACL_RULE_LIST {
+
+				key "ACL_TABLE_NAME RULE_NAME";
+
+				leaf ACL_TABLE_NAME {
+					type leafref {
+						path "/ctrl-plane-acl:sonic-ctrl-plane-acl/ctrl-plane-acl:CTRL_PLANE_ACL_TABLE/ctrl-plane-acl:CTRL_PLANE_ACL_TABLE_LIST/ctrl-plane-acl:ACL_TABLE_NAME";
+					}
+				}
+
+				leaf RULE_NAME {
+					type string {
+						length 1..255;
+					}
+				}
+
+				leaf PACKET_ACTION {
+					type stypes:packet_action;
+				}
+
+				leaf PRIORITY {
+					type uint32 {
+						range 0..999999;
+					}
+				}
+
+				choice ip_prefix {
+
+					case ip4_prefix {
+						when "boolean(IP_TYPE[.='ANY' or .='IP' or .='IPV4' or .='IPv4ANY' or .='ARP'])";
+						leaf SRC_IP {
+							type inet:ipv4-prefix;
+						}
+
+						leaf DST_IP {
+							type inet:ipv4-prefix;
+						}
+					}
+
+					case ip6_prefix {
+						when "boolean(IP_TYPE[.='ANY' or .='IP' or .='IPV6' or .='IPv6ANY'])";
+						leaf SRC_IPV6 {
+							type inet:ipv6-prefix;
+						}
+
+						leaf DST_IPV6 {
+							type inet:ipv6-prefix;
+						}
+					}
+				}
+
+				leaf TCP_FLAGS {
+					type string {
+						pattern '0[x][0-9a-fA-F]{1,2}|0[X][0-9a-fA-F]{1,2}';
+					}
+				}
+			}
+			/* end of CTRL_PLANE_ACL_RULE_LIST */
+		}
+		/* end of container CTRL_PLANE_ACL_RULE */
+
+		container CTRL_PLANE_ACL_TABLE {
+
+			description "CTRL_PLANE_ACL_TABLE part of config_db.json";
+
+			list CTRL_PLANE_ACL_TABLE_LIST {
+
+				key "ACL_TABLE_NAME";
+
+				leaf ACL_TABLE_NAME {
+					type string;
+				}
+
+				leaf policy_desc {
+					type string {
+						length 1..255;
+					}
+				}
+
+				leaf stage {
+					type string {
+						pattern "ingress|egress|INGRESS|EGRESS";
+					}
+					default "INGRESS";
+				}
+
+				leaf-list services {
+					type string;
+				}
+
+			}
+			/* end of CTRL_PLANE_ACL_TABLE_LIST */
+		}
+        /* end of container CTRL_PLANE_ACL_TABLE */
+	}
+    /* end of container sonic-ctlr-plane-acl */
+}
+/* end of module sonic-ctrl-plane-acl */

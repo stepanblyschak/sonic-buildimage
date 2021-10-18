@@ -583,6 +583,7 @@ def parse_dpg(dpg, hname):
             vlans[sonic_vlan_name] = vlan_attributes
 
         acls = {}
+        ctrl_plane_acls = {}
         for aclintf in aclintfs.findall(str(QName(ns, "AclInterface"))):
             if aclintf.find(str(QName(ns, "InAcl"))) is not None:
                 aclname = aclintf.find(str(QName(ns, "InAcl"))).text.upper().replace(" ", "_").replace("-", "_")
@@ -662,18 +663,15 @@ def parse_dpg(dpg, hname):
 
                     # If we already have an ACL with this name and this ACL is bound to a different service,
                     # append the service to our list of services
-                    if aclname in acls:
-                        if acls[aclname]['type'] != 'CTRLPLANE':
-                            print("Warning: ACL '%s' type mismatch. Not updating ACL." % aclname, file=sys.stderr)
-                        elif acls[aclname]['services'] == aclservice:
+                    if aclname in ctrl_plane_acls:
+                        if ctrl_plane_acls[aclname]['services'] == aclservice:
                             print("Warning: ACL '%s' already contains service '%s'. Not updating ACL." % (aclname, aclservice), file=sys.stderr)
                         else:
-                            acls[aclname]['services'].append(aclservice)
+                            ctrl_plane_acls[aclname]['services'].append(aclservice)
                     else:
-                        acls[aclname] = {'policy_desc': aclname,
-                                         'type': 'CTRLPLANE',
-                                         'stage': stage,
-                                         'services': [aclservice]}
+                        ctrl_plane_acls[aclname] = {'policy_desc': aclname,
+                                                    'stage': stage,
+                                                    'services': [aclservice]}
                 except:
                     print("Warning: Ignoring Control Plane ACL %s without type" % aclname, file=sys.stderr)
 
@@ -696,7 +694,7 @@ def parse_dpg(dpg, hname):
                     if mg_key in mg_tunnel.attrib:
                         tunnelintfs[tunnel_type][tunnel_name][table_key] = mg_tunnel.attrib[mg_key]
 
-        return intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, vni, tunnelintfs, dpg_ecmp_content
+        return intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, ctrl_plane_acls, vni, tunnelintfs, dpg_ecmp_content
     return None, None, None, None, None, None, None, None, None, None, None, None, None
 
 def parse_host_loopback(dpg, hname):
@@ -1223,7 +1221,7 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
     for child in root:
         if asic_name is None:
             if child.tag == str(QName(ns, "DpgDec")):
-                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, hostname)
+                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, ctrl_plane_acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, hostname)
             elif child.tag == str(QName(ns, "CpgDec")):
                 (bgp_sessions, bgp_internal_sessions, bgp_voq_chassis_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, hostname)
             elif child.tag == str(QName(ns, "PngDec")):
@@ -1238,7 +1236,7 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
                 (port_speeds_default, port_descriptions, sys_ports) = parse_deviceinfo(child, hwsku)
         else:
             if child.tag == str(QName(ns, "DpgDec")):
-                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, asic_name)
+                (intfs, lo_intfs, mvrf, mgmt_intf, voq_inband_intfs, vlans, vlan_members, dhcp_relay_table, pcs, pc_members, acls, ctrl_plane_acls, vni, tunnel_intfs, dpg_ecmp_content) = parse_dpg(child, asic_name)
                 host_lo_intfs = parse_host_loopback(child, hostname)
             elif child.tag == str(QName(ns, "CpgDec")):
                 (bgp_sessions, bgp_internal_sessions, bgp_voq_chassis_sessions, bgp_asn, bgp_peers_with_range, bgp_monitors) = parse_cpg(child, asic_name, local_devices)
@@ -1590,6 +1588,7 @@ def parse_xml(filename, platform=None, port_config_file=None, asic_name=None, hw
     results['NTP_SERVER'] = dict((item, {}) for item in ntp_servers)
     results['TACPLUS_SERVER'] = dict((item, {'priority': '1', 'tcp_port': '49'}) for item in tacacs_servers)
     results['ACL_TABLE'] = filter_acl_table_bindings(acls, neighbors, pcs, sub_role)
+    results['CTRL_PLANE_ACL_TABLE'] = filter_acl_table_bindings(ctrl_plane_acls, neighbors, pcs, sub_role)
     results['FEATURE'] = {
         'telemetry': {
             'status': 'enabled'

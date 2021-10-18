@@ -1,0 +1,18 @@
+{
+    "CTRL_PLANE_ACL_TABLE_STAGE_SERVICES": {
+        "sonic-ctrl-plane-acl:sonic-ctrl-plane-acl": {
+            "sonic-ctrl-plane-acl:CTRL_PLANE_ACL_TABLE": {
+                "CTRL_PLANE_ACL_TABLE_LIST": [
+                    {
+                        "ACL_TABLE_NAME": "NO-NSW-PACL-V4",
+                        "policy_desc": "Filter IPv4",
+                        "services": [
+                            "SNMP"
+                        ],
+                        "stage": "ingress"
+                    }
+                ]
+            }
+        }
+    }
+}

@@ -49,6 +49,7 @@ setup(
                          './yang-models/sonic-breakout_cfg.yang',
                          './yang-models/sonic-copp.yang',
                          './yang-models/sonic-crm.yang',
+                         './yang-models/sonic-ctrl-plane-acl.yang',
                          './yang-models/sonic-device_metadata.yang',
                          './yang-models/sonic-device_neighbor.yang',
                          './yang-models/sonic-extension.yang',

@@ -53,15 +53,6 @@
             "value": "INGRESS"
         }
     },
-    "ACL_TABLE_STAGE_SERVICES": {
-        "desc": "ACL_TABLE LOAD STAGE SERVICES SUCCESSFULLY.",
-        "eStrKey" : "Verify",
-        "verify": {
-            "xpath": "/sonic-acl:sonic-acl/ACL_TABLE/ACL_TABLE_LIST[ACL_TABLE_NAME='NO-NSW-PACL-V4']/ACL_TABLE_NAME",
-            "key": "sonic-acl:services",
-            "value": ["SNMP"]
-        }
-    },
     "ACL_TABLE_CUSTOM_TABLE_TYPE": {
         "desc": "ACL_TABLE LOAD TABLE TYPE SUCCESSFULLY."
     }

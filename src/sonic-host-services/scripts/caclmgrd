@@ -52,12 +52,10 @@ class ControlPlaneAclManager(daemon_base.DaemonBase):
     Attributes:
         config_db: Handle to Config Redis database via SwSS SDK
     """
-    ACL_TABLE = "ACL_TABLE"
-    ACL_RULE = "ACL_RULE"
+    CTRL_PLANE_ACL_TABLE = "CTRL_PLANE_ACL_TABLE"
+    CTRL_PLANE_ACL_RULE = "CTRL_PLANE_ACL_RULE"
     DEVICE_METADATA_TABLE = "DEVICE_METADATA"
     MUX_CABLE_TABLE = "MUX_CABLE_TABLE"
-
-    ACL_TABLE_TYPE_CTRLPLANE = "CTRLPLANE"
 
     # To specify a port range instead of a single port, use iptables format:
     # separate start and end ports with a colon, e.g., "1000:2000"
@@ -484,8 +482,8 @@ class ControlPlaneAclManager(daemon_base.DaemonBase):
         iptables_cmds.append(self.iptables_cmd_ns_prefix[namespace] + "ip6tables -A INPUT -p tcp --sport 179 -j ACCEPT")
 
         # Get current ACL tables and rules from Config DB
-        self._tables_db_info = self.config_db_map[namespace].get_table(self.ACL_TABLE)
-        self._rules_db_info = self.config_db_map[namespace].get_table(self.ACL_RULE)
+        self._tables_db_info = self.config_db_map[namespace].get_table(self.CTRL_PLANE_ACL_TABLE)
+        self._rules_db_info = self.config_db_map[namespace].get_table(self.CTRL_PLANE_ACL_RULE)
 
         num_ctrl_plane_acl_rules = 0
 
@@ -493,10 +491,6 @@ class ControlPlaneAclManager(daemon_base.DaemonBase):
         for (table_name, table_data) in self._tables_db_info.items():
 
             table_ip_version = None
-
-            # Ignore non-control-plane ACL tables
-            if table_data["type"] != self.ACL_TABLE_TYPE_CTRLPLANE:
-                continue
 
             acl_services = table_data["services"]
 
@@ -730,9 +724,9 @@ class ControlPlaneAclManager(daemon_base.DaemonBase):
             # Connect to Config DB of given namespace
             acl_db_connector = swsscommon.DBConnector("CONFIG_DB", 0, False, namespace)
             # Subscribe to notifications when ACL tables changes
-            subscribe_acl_table = swsscommon.SubscriberStateTable(acl_db_connector, swsscommon.CFG_ACL_TABLE_TABLE_NAME)
+            subscribe_acl_table = swsscommon.SubscriberStateTable(acl_db_connector, swsscommon.CFG_CTRL_PLANE_ACL_TABLE_TABLE_NAME)
             # Subscribe to notifications when ACL rule tables changes
-            subscribe_acl_rule_table = swsscommon.SubscriberStateTable(acl_db_connector, swsscommon.CFG_ACL_RULE_TABLE_NAME)
+            subscribe_acl_rule_table = swsscommon.SubscriberStateTable(acl_db_connector, swsscommon.CFG_CTRL_PLANE_ACL_RULE_TABLE_NAME)
             # Add both tables to the selectable object
             sel.addSelectable(subscribe_acl_table)
             sel.addSelectable(subscribe_acl_rule_table)
@@ -785,8 +779,7 @@ class ControlPlaneAclManager(daemon_base.DaemonBase):
                     # Check ACL Rule notification and make sure Rule point to ACL Table which is Controlplane
                     else:
                         acl_table = key.split(acl_rule_table_seprator)[0]
-                        if self.config_db_map[namespace].get_table(self.ACL_TABLE)[acl_table]["type"] == self.ACL_TABLE_TYPE_CTRLPLANE:
-                            ctrl_plane_acl_notification.add(namespace)
+                        ctrl_plane_acl_notification.add(namespace)
 
             # Update the Control Plane ACL of the namespace that got config db acl table event
             for namespace in ctrl_plane_acl_notification:

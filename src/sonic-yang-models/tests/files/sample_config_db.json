@@ -630,6 +630,15 @@
                 ]
             }
         },
+        "CTRL_PLANE_ACL_TABLE": {
+            "SSH_ONLY": {
+                "policy_desc": "SSH only",
+                "services": [
+                    "SSH"
+                ],
+                "stage": "ingress"
+            }
+        },
         "PBH_HASH_FIELD": {
             "inner_ip_proto": {
                 "hash_field": "INNER_IP_PROTOCOL",

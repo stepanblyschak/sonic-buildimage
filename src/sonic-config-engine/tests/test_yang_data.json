@@ -261,24 +261,6 @@
                     ],
                     "stage": "ingress",
                     "type": "MIRRORV6"
-                },
-                {
-                    "ACL_TABLE_NAME": "SNMP_ACL",
-                    "policy_desc": "SNMP_ACL",
-                    "services": [
-                        "SNMP"
-                    ],
-                    "stage": "ingress",
-                    "type": "CTRLPLANE"
-                },
-                {
-                    "ACL_TABLE_NAME": "SSH_ONLY",
-                    "policy_desc": "SSH_ONLY",
-                    "services": [
-                        "SSH"
-                    ],
-                    "stage": "ingress",
-                    "type": "CTRLPLANE"
                 }
             ]
         },
@@ -300,6 +282,30 @@
                     "SRC_IP": "10.10.1.1/16",
                     "IP_TYPE": "IPV4",
                     "RULE_NAME": "Rule2"
+                }
+            ]
+        }
+    },
+    "sonic-ctrl-plane-acl:sonic-ctrl-plane-acl": {
+        "sonic-ctrl-plane:CTRL_PLANE_ACL_TABLE": {
+            "CTRL_PLANE_ACL_TABLE_LIST": [
+                {
+                    "ACL_TABLE_NAME": "SNMP_ACL",
+                    "policy_desc": "SNMP_ACL",
+                    "services": [
+                        "SNMP"
+                    ],
+                    "stage": "ingress",
+                    "type": "CTRLPLANE"
+                },
+                {
+                    "ACL_TABLE_NAME": "SSH_ONLY",
+                    "policy_desc": "SSH_ONLY",
+                    "services": [
+                        "SSH"
+                    ],
+                    "stage": "ingress",
+                    "type": "CTRLPLANE"
                 }
             ]
         }
