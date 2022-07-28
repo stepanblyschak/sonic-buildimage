@@ -47,9 +47,6 @@ g_dep_services = []
 
 def wait_for_container(docker_client, container_name):
     while True:
-        while docker_client.inspect_container(container_name)['State']['Status'] != "running":
-            time.sleep(1)
-
         docker_client.wait(container_name)
 
         log.log_info("No longer waiting on container '{}'".format(container_name))
