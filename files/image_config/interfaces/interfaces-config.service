@@ -2,6 +2,7 @@
 Description=Update interfaces configuration
 Requires=updategraph.service
 After=updategraph.service
+Before=networking.service
 BindsTo=sonic.target
 After=sonic.target
 
@@ -12,3 +13,4 @@ ExecStart=/usr/bin/interfaces-config.sh
 
 [Install]
 WantedBy=sonic.target
+RequiredBy=networking.service
