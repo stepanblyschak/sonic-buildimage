@@ -790,7 +790,10 @@ sudo LANG=C DOCKER_HOST="$DOCKER_HOST" chroot $FILESYSTEM_ROOT sonic-package-man
 
 {% for package in sonic_local_packages.strip().split() -%}
 {% set name, path, set_owner, enabled = package.split('|') -%}
+{% set imagefilename = path.split('/')|last -%}
+{% set imagename = imagefilename.split('.')|first -%}
 sudo LANG=C DOCKER_HOST="$DOCKER_HOST" chroot $FILESYSTEM_ROOT sonic-package-manager install --from-tarball {{ path }} {{ get_install_options(set_owner, enabled) }}
+sudo LANG=C DOCKER_HOST="$DOCKER_HOST" chroot $FILESYSTEM_ROOT docker tag {{imagename}}:latest {{imagename}}:"${SONIC_IMAGE_VERSION}"
 {% endfor -%}
 
 sudo umount $FILESYSTEM_ROOT/target
