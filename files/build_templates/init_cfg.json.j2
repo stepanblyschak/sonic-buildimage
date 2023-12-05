@@ -38,7 +38,7 @@
                    ("lldp", "enabled", true, "enabled"),
                    ("pmon", "enabled", true, "enabled"),
                    ("snmp", "enabled", true, "enabled"),
-                   ("eventd", "enabled", false, "enabled"),
+                   ("eventd", "enabled", true, "enabled"),
                    ("swss", "enabled", false, "enabled"),
                    ("syncd", "enabled", false, "enabled")] %}
 {%- if include_router_advertiser == "y" %}{% do features.append(("radv", "enabled", false, "enabled")) %}{% endif %}
