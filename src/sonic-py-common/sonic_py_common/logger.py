@@ -27,19 +27,19 @@ class Logger(object):
     DEFAULT_LOG_OPTION = LOG_OPTION_NDELAY
 
     def __init__(self, log_identifier=None, log_facility=DEFAULT_LOG_FACILITY, log_option=DEFAULT_LOG_OPTION,
-                 enable_set_log_level_on_fly=False):
+                 enable_set_log_level_on_fly=False, db_name=None):
         if log_identifier is None:
             log_identifier = os.path.basename(sys.argv[0])
+        if db_name is None:
+            self.db_name = log_identifier
+        else:
+            self.db_name = db_name
+        self.enable_set_log_level_on_fly = enable_set_log_level_on_fly
 
         # Initialize syslog
         syslog.openlog(ident=log_identifier, logoption=log_option, facility=log_facility)
 
         self._logger = None
-
-        if enable_set_log_level_on_fly:
-            # Performance warning: linkToDbNative will potentially create a new thread.
-            # The thread listens to CONFIG DB for log level changes.
-            self.logger.linkToDbNative(log_identifier, 'NOTICE')
 
     def __del__(self):
         syslog.closelog()
@@ -64,6 +64,10 @@ class Logger(object):
                 SwssLogger.getInstance.return_value = instance
                 instance.getMinPrio.return_value = syslog.LOG_NOTICE
             self._logger = SwssLogger.getInstance()
+            if self.enable_set_log_level_on_fly:
+                # Performance warning: linkToDbNative will potentially create a new thread.
+                # The thread listens to CONFIG DB for log level changes.
+                self._logger.linkToDbNative(self.db_name, 'NOTICE')
         return self._logger
 
     #
