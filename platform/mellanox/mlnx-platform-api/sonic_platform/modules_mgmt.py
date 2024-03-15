@@ -99,7 +99,6 @@ class ModulesMgmtTask(threading.Thread):
         self.setName("ModulesMgmtTask")
         self.register_hw_present_fds = []
         self.is_warm_reboot = False
-        self.is_fast_reboot = False
         self.port_control_dict = {}
 
     # SFPs state machine
@@ -163,9 +162,7 @@ class ModulesMgmtTask(threading.Thread):
             cmdline_dict[CMDLINE_STR_TO_LOOK_FOR] = proc_cmdline_str.split(CMDLINE_STR_TO_LOOK_FOR)[1]
         if CMDLINE_STR_TO_LOOK_FOR in cmdline_dict.keys():
             self.is_warm_reboot = cmdline_dict[CMDLINE_STR_TO_LOOK_FOR] == CMDLINE_VAL_TO_LOOK_FOR
-            self.is_fast_reboot = cmdline_dict[CMDLINE_STR_TO_LOOK_FOR] == CMDLINE_VAL_TO_LOOK_FOR_FAST_REBOOT
-            logger.log_info(f"system was warm or fast rebooted is_warm_reboot: {self.is_warm_reboot} is_fast_reboot:"
-                            f"{self.is_fast_reboot}")
+            logger.log_info(f"system was warm rebooted is_warm_reboot: {self.is_warm_reboot}")
         for port in range(num_of_ports):
             # check sysfs per port whether it's independent mode or legacy
             temp_module_sm = ModuleStateMachine(port_num=port, initial_state=STATE_HW_NOT_PRESENT
@@ -665,7 +662,7 @@ class ModulesMgmtTask(threading.Thread):
                     self.register_hw_present_fds.append(module_obj)
                 else:
                     port_status = '1'
-                if dynamic or (not self.is_warm_reboot and not self.is_fast_reboot):
+                if dynamic or not self.is_warm_reboot:
                     self.sfp_changes_dict[str(module_obj.port_num + 1)] = port_status
 
     def delete_ports_from_dict(self, dynamic=False):
