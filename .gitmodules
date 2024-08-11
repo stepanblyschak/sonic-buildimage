@@ -13,7 +13,7 @@
 [submodule "sonic-swss"]
 	path = src/sonic-swss
 	url = https://github.com/arfeigin/sonic-swss
-	branch = 202311_fb_improvements_2
+	branch = 202311_fb_improvements_sai_stubs
 [submodule "src/p4c-bm/p4c-bm"]
 	path = platform/p4/p4c-bm/p4c-bm
 	url = https://github.com/krambn/p4c-bm
