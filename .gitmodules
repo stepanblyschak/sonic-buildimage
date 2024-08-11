@@ -9,7 +9,7 @@
 [submodule "sonic-sairedis"]
 	path = src/sonic-sairedis
 	url = https://github.com/arfeigin/sonic-sairedis
-	branch = 202311_fb_improvements_2
+	branch = 202311_fb_improvements_sai_stubs
 [submodule "sonic-swss"]
 	path = src/sonic-swss
 	url = https://github.com/arfeigin/sonic-swss
