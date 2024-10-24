@@ -50,6 +50,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -60,6 +63,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
             }
 
             container PFCWD {
@@ -67,12 +73,18 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
             }
 
             container PG_DROP {
                 /* PG_DROP_STAT_COUNTER_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -84,6 +96,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -93,6 +108,9 @@ module sonic-flex_counter {
                 /* PORT_STAT_COUNTER_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -104,12 +122,18 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
             }
 
             container PORT_BUFFER_DROP {
                 /* PORT_BUFFER_DROP_COUNTER_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -121,6 +145,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -130,6 +157,9 @@ module sonic-flex_counter {
                 /* QUEUE_WATERMARK_STAT_COUNTER_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -141,6 +171,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -151,12 +184,18 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
             }
 
             container ACL {
                 /* ACL_STAT_COUNTER_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -168,6 +207,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -177,6 +219,9 @@ module sonic-flex_counter {
                 /* ROUTE_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
@@ -188,6 +233,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -198,6 +246,9 @@ module sonic-flex_counter {
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
                 }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
+                }
                 leaf POLL_INTERVAL {
                     type poll_interval;
                 }
@@ -207,6 +258,9 @@ module sonic-flex_counter {
                 /* WRED_ECN_QUEUE_FLEX_COUNTER_GROUP */
                 leaf FLEX_COUNTER_STATUS {
                     type flex_status;
+                }
+                leaf FLEX_COUNTER_DELAY_STATUS {
+                    type flex_delay_status;
                 }
                 leaf POLL_INTERVAL {
                     type poll_interval;
