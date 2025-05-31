@@ -1394,6 +1394,7 @@ static ssize_t netlink_srv6_msg_encode(int cmd,
 	return NLMSG_ALIGN(req->n.nlmsg_len);
 }
 
+#define DPLANE_FPM_NL_BUF_SIZE 65536
 /**
  * Encode data plane operation context into netlink and enqueue it in the FPM
  * output buffer.
@@ -1404,7 +1405,7 @@ static ssize_t netlink_srv6_msg_encode(int cmd,
  */
 static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 {
-	uint8_t nl_buf[NL_PKT_BUF_SIZE];
+	uint8_t nl_buf[DPLANE_FPM_NL_BUF_SIZE];
 	size_t nl_buf_len;
 	ssize_t rv;
 	uint64_t obytes, obytes_peak;
@@ -1445,6 +1446,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 				zlog_err(
 					"%s: netlink_srv6_msg_encode failed",
 					__func__);
+                                dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 				return 0;
 			}
 		} else {
@@ -1455,6 +1457,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 				zlog_err(
 					"%s: netlink_route_multipath_msg_encode failed",
 					__func__);
+                                dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 				return 0;
 			}
 		}
@@ -1476,6 +1479,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 				zlog_err(
 					"%s: netlink_srv6_msg_encode failed",
 					__func__);
+                                dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 				return 0;
 			}
 		} else {
@@ -1486,6 +1490,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 				zlog_err(
 					"%s: netlink_route_multipath_msg_encode failed",
 					__func__);
+                                dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 				return 0;
 			}
 		}
@@ -1500,6 +1505,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 		if (rv <= 0) {
 			zlog_err("%s: netlink_macfdb_update_ctx failed",
 				 __func__);
+                        dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 			return 0;
 		}
 
@@ -1512,6 +1518,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 		if (rv <= 0) {
 			zlog_err("%s: netlink_nexthop_msg_encode failed",
 				 __func__);
+                        dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 			return 0;
 		}
 
@@ -1524,6 +1531,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 		if (rv <= 0) {
 			zlog_err("%s: netlink_nexthop_msg_encode failed",
 				 __func__);
+                        dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 			return 0;
 		}
 
@@ -1537,6 +1545,7 @@ static int fpm_nl_enqueue(struct fpm_nl_ctx *fnc, struct zebra_dplane_ctx *ctx)
 		if (rv <= 0) {
 			zlog_err("%s: netlink_lsp_msg_encoder failed",
 				 __func__);
+                        dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_FAILURE);
 			return 0;
 		}
 
@@ -1996,7 +2005,7 @@ static void fpm_process_queue(struct event *t)
 
 	while (true) {
 		/* No space available yet. */
-		if (STREAM_WRITEABLE(fnc->obuf) < NL_PKT_BUF_SIZE) {
+		if (STREAM_WRITEABLE(fnc->obuf) < DPLANE_FPM_NL_BUF_SIZE) {
 			no_bufs = true;
 			break;
 		}
@@ -2020,7 +2029,6 @@ static void fpm_process_queue(struct event *t)
 		/* Account the processed entries. */
 		processed_contexts++;
 
-		dplane_ctx_set_status(ctx, ZEBRA_DPLANE_REQUEST_SUCCESS);
 		dplane_provider_enqueue_out_ctx(fnc->prov, ctx);
 	}
 
@@ -2115,8 +2123,8 @@ static int fpm_nl_start(struct zebra_dplane_provider *prov)
 	fnc = dplane_provider_get_data(prov);
 	fnc->fthread = frr_pthread_new(NULL, prov_name, prov_name);
 	assert(frr_pthread_run(fnc->fthread, NULL) == 0);
-	fnc->ibuf = stream_new(NL_PKT_BUF_SIZE);
-	fnc->obuf = stream_new(NL_PKT_BUF_SIZE * 128);
+	fnc->ibuf = stream_new(DPLANE_FPM_NL_BUF_SIZE);
+	fnc->obuf = stream_new(DPLANE_FPM_NL_BUF_SIZE * 128);
 	pthread_mutex_init(&fnc->obuf_mutex, NULL);
 	fnc->socket = -1;
 	fnc->disabled = true;

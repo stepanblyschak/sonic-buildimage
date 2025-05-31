@@ -1,0 +1,58 @@
+From 34881df9e039e4f570fb9bf7eaeda6990f236578 Mon Sep 17 00:00:00 2001
+From: Donald Sharp <sharpd@nvidia.com>
+Date: Fri, 30 May 2025 19:32:03 -0400
+Subject: [PATCH 3/3] zebra: Let's let zebra notice that a route installation
+ failed
+
+Currently when using the dplane_fpm_nl module and a route installation
+fails in that code, zebra is being notified that the route failed
+to install but was doing nothing about it.  Leaving the routes
+in a `queued` state.  Which is not a good.  Modify the code
+to remove the queued state and properly notice that the route
+installation has failed for the operator.
+
+New behavior(Note that I've intentionally introduced the problem):
+2025-05-30 19:30:29.796 [ERR!] zebra: [X4VXS-XMMJ2] fpm_nl_enqueue: netlink_route_multipath_msg_encode failed
+2025-05-30 19:30:29.796 [DEBG] zebra: [JGWSB-SMNVE] dplane: incoming new work counter: 0
+2025-05-30 19:30:29.796 [DEBG] zebra: [QP8G8-08P0Q] dplane enqueues 0 new work to provider 'Kernel' curr is 0
+2025-05-30 19:30:29.796 [DEBG] zebra: [JVY1P-93VFY] dplane provider 'Kernel': processing
+2025-05-30 19:30:29.796 [DEBG] zebra: [VCDW6-A7ZF1] dplane dequeues 0 completed work from provider Kernel
+2025-05-30 19:30:29.796 [DEBG] zebra: [QP8G8-08P0Q] dplane enqueues 0 new work to provider 'dplane_fpm_nl' curr is 0
+2025-05-30 19:30:29.796 [DEBG] zebra: [VCDW6-A7ZF1] dplane dequeues 3 completed work from provider dplane_fpm_nl
+2025-05-30 19:30:29.796 [DEBG] zebra: [JTWAB-1MH4Y] dplane has 3 completed, 0 errors, for zebra main
+2025-05-30 19:30:29.796 [DEBG] zebra: [J7K9Z-9M7DT] Nexthop dplane ctx 0x55c0f6258700, op NH_INSTALL, nexthop ID (17), result SUCCESS
+2025-05-30 19:30:29.796 [DEBG] zebra: [J7K9Z-9M7DT] Nexthop dplane ctx 0x55c0f624add0, op NH_INSTALL, nexthop ID (16), result SUCCESS
+2025-05-30 19:30:29.796 [DEBG] zebra: [S17A6-6B1X2] default(0:254):1::1/128 Processing dplane result ctx 0x55c0f624c000, op ROUTE_UPDATE result FAILURE
+2025-05-30 19:30:29.796 [DEBG] zebra: [TFH34-6R9W1] default(0:254):1::1/128 Stale dplane result for old_re 0x55c0f62569d0
+2025-05-30 19:30:29.796 [WARN] zebra: [VYKYC-709DP] default(0:254):1::1/128: Route install failed
+r1(config)# do show ipv6 route
+Codes: K - kernel route, C - connected, L - local, S - static,
+       R - RIPng, O - OSPFv3, I - IS-IS, B - BGP, N - NHRP,
+       T - Table, v - VNC, V - VNC-Direct, A - Babel, D - SHARP,
+       F - PBR, f - OpenFabric, t - Table-Direct,
+       > - selected route, * - FIB route, q - queued, r - rejected, b - backup
+       t - trapped, o - offload failure
+
+IPv6 unicast VRF default:
+S>r 1::1/128 [1/0] via fe80::1, r1-eth0, weight 1, 00:00:03
+  r                via fe80::2, r1-eth0, weight 1, 00:00:03
+  r                via fe80::3, r1-eth0, weight 1, 00:00:03
+C>* fe80::/64 is directly connected, r1-eth0, weight 1, 00:00:58
+
+Signed-off-by: Donald Sharp <sharpd@nvidia.com>
+
+diff --git a/zebra/zebra_rib.c b/zebra/zebra_rib.c
+index d3fc0cb8a1..3f54eab798 100644
+--- a/zebra/zebra_rib.c
++++ b/zebra/zebra_rib.c
+@@ -2219,6 +2219,7 @@ static void rib_process_result(struct zebra_dplane_ctx *ctx)
+ 			if (re) {
+ 				SET_FLAG(re->status, ROUTE_ENTRY_FAILED);
+ 				UNSET_FLAG(re->status, ROUTE_ENTRY_INSTALLED);
++				UNSET_FLAG(re->status, ROUTE_ENTRY_QUEUED);
+ 			} if (old_re)
+ 				SET_FLAG(old_re->status, ROUTE_ENTRY_FAILED);
+ 			if (re)
+-- 
+2.43.2
+
