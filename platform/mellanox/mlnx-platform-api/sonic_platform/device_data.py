@@ -385,10 +385,10 @@ class DeviceDataManager:
                                 'power_good', 'power_limit', 'power_on', 'temperature/input'])
         else:
             conditions.append(lambda: utils.read_int_from_file('/var/run/hw-management/config/asics_init_done') == 1)
-        sfp_count = cls.get_sfp_count()
-        for sfp_index in range(sfp_count):
-            for sysfs_node in sysfs_nodes:
-                conditions.append(lambda: os.path.exists(f'/sys/module/sx_core/asic0/module{sfp_index}/{sysfs_node}'))
+        # sfp_count = cls.get_sfp_count()
+        # for sfp_index in range(sfp_count):
+        #     for sysfs_node in sysfs_nodes:
+        #         conditions.append(lambda: os.path.exists(f'/sys/module/sx_core/asic0/module{sfp_index}/{sysfs_node}'))
         return utils.wait_until_conditions(conditions, 300, 1)
 
     @classmethod
