@@ -63,9 +63,6 @@ RUN apt purge -y python3-pip
 # For templating
 RUN pip3 install j2cli
 
-# Install supervisor
-RUN pip3 install supervisor==4.2.5
-
 # Add support for supervisord to handle startup dependencies
 RUN pip3 install supervisord-dependent-startup==1.4.0
 
@@ -81,6 +78,14 @@ RUN apt autoremove -y --purge
 # Install built Debian packages and implicitly install their dependencies
 {{ install_debian_packages(docker_base_bookworm_debs.split(' ')) }}
 {%- endif %}
+
+{% if docker_base_bookworm_whls.strip() -%}
+# Copy locally-built Python wheel dependencies
+{{ copy_files("python-wheels/", docker_base_bookworm_whls.split(' '), "/python-wheels/") }}
+
+# Install locally-built Python wheel dependencies
+{{ install_python_wheels(docker_base_bookworm_whls.split(' ')) }}
+{% endif %}
 
 COPY ["etc/rsyslog.conf", "/etc/rsyslog.conf"]
 COPY ["etc/rsyslog.d/*", "/etc/rsyslog.d/"]
