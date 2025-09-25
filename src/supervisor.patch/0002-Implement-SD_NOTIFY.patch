@@ -1,0 +1,190 @@
+From a968889189651b2ece56ef855be9103ee8b8251c Mon Sep 17 00:00:00 2001
+From: Stepan Blyschak <stepanb@nvidia.com>
+Date: Thu, 25 Sep 2025 15:21:56 +0000
+Subject: [PATCH] Implement SD_NOTIFY
+
+Signed-off-by: Stepan Blyschak <stepanb@nvidia.com>
+---
+ supervisor/options.py     | 11 +++++++++++
+ supervisor/process.py     | 22 ++++++++++++++++++++++
+ supervisor/supervisord.py | 17 +++++++++++++++++
+ supervisor/tests/base.py  |  5 +++++
+ 4 files changed, 55 insertions(+)
+
+diff --git a/supervisor/options.py b/supervisor/options.py
+index f5cb0c9..a76098c 100644
+--- a/supervisor/options.py
++++ b/supervisor/options.py
+@@ -55,6 +55,8 @@ from supervisor import states
+ from supervisor import xmlrpc
+ from supervisor import poller
+ 
++NOTIFY_SOCKET_NAME = "\0sd_notify.sock"
++
+ def _read_version_txt():
+     mydir = os.path.abspath(os.path.dirname(__file__))
+     version_txt = os.path.join(mydir, 'version.txt')
+@@ -410,6 +412,7 @@ class ServerOptions(Options):
+     unlink_pidfile = False
+     unlink_socketfiles = False
+     mood = states.SupervisorStates.RUNNING
++    notify_sock = None
+ 
+     def __init__(self):
+         Options.__init__(self)
+@@ -1245,6 +1248,9 @@ class ServerOptions(Options):
+             # will be passed to # select(), which will bomb.  See
+             # also https://web.archive.org/web/20160729222427/http://www.plope.com/software/collector/253
+             server.close()
++    
++    def close_notify_socket(self):
++        self.notify_sock.close()
+ 
+     def close_logger(self):
+         self.logger.close()
+@@ -1282,6 +1288,11 @@ class ServerOptions(Options):
+         except ValueError as why:
+             self.usage(why.args[0])
+ 
++    def open_notify_socket(self):
++        self.notify_sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
++        self.notify_sock.bind(NOTIFY_SOCKET_NAME)
++        self.notify_sock.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
++
+     def get_autochildlog_name(self, name, identifier, channel):
+         prefix='%s-%s---%s-' % (name, channel, identifier)
+         logfile = self.mktempfile(
+diff --git a/supervisor/process.py b/supervisor/process.py
+index b394be8..00da919 100644
+--- a/supervisor/process.py
++++ b/supervisor/process.py
+@@ -310,6 +310,8 @@ class Subprocess(object):
+             # set environment
+             env = os.environ.copy()
+             env['SUPERVISOR_ENABLED'] = '1'
++            from supervisor.options import NOTIFY_SOCKET_NAME
++            env['NOTIFY_SOCKET'] = NOTIFY_SOCKET_NAME.replace("\0", "@")
+             serverurl = self.config.serverurl
+             if serverurl is None: # unset
+                 serverurl = self.config.options.serverurl # might still be None
+@@ -717,6 +719,17 @@ class Subprocess(object):
+                                                           self.pid))
+                 self.kill(signal.SIGKILL)
+ 
++    def handle_sd_notify(self, msg):
++        for kv in msg.splitlines():
++            if kv == "READY=1":
++                if self.state == ProcessStates.STARTING:
++                    self.delay = 0
++                    self.backoff = 0
++                    self.change_state(ProcessStates.RUNNING)
++                    msg = 'entered RUNNING state, process sent READY=1'
++                    self.config.options.logger.info('success: %s %s' % (self.config.name, msg))
++
++
+ class FastCGISubprocess(Subprocess):
+     """Extends Subprocess class to handle FastCGI subprocesses"""
+ 
+@@ -841,11 +854,20 @@ class ProcessGroupBase(object):
+     def before_remove(self):
+         pass
+ 
++    def handle_sd_notify(self, _msg, _pid):
++        pass
++
+ class ProcessGroup(ProcessGroupBase):
+     def transition(self):
+         for proc in self.processes.values():
+             proc.transition()
+ 
++    def handle_sd_notify(self, msg, pid):
++        for proc in self.processes.values():
++            if proc.pid == pid:
++                proc.handle_sd_notify(msg)
++                break
++
+ class FastCGIProcessGroup(ProcessGroup):
+ 
+     def __init__(self, config, **kwargs):
+diff --git a/supervisor/supervisord.py b/supervisor/supervisord.py
+index 0a4f3e6..968e4d2 100755
+--- a/supervisor/supervisord.py
++++ b/supervisor/supervisord.py
+@@ -85,6 +85,7 @@ class Supervisor:
+             for config in self.options.process_group_configs:
+                 self.add_process_group(config)
+             self.options.openhttpservers(self)
++            self.options.open_notify_socket()
+             self.options.setsignals()
+             if (not self.options.nodaemon) and self.options.first:
+                 self.options.daemonize()
+@@ -176,6 +177,7 @@ class Supervisor:
+         timeout = 1 # this cannot be fewer than the smallest TickEvent (5)
+ 
+         socket_map = self.options.get_socket_map()
++        notify_sock = self.options.notify_sock
+ 
+         while 1:
+             combined_map = {}
+@@ -200,6 +202,9 @@ class Supervisor:
+                     # killing everything), it's OK to shutdown or reload
+                     raise asyncore.ExitNow
+ 
++            if self.options.notify_sock:
++                self.options.poller.register_readable(notify_sock.fileno())
++
+             for fd, dispatcher in combined_map.items():
+                 if dispatcher.readable():
+                     self.options.poller.register_readable(fd)
+@@ -238,6 +243,17 @@ class Supervisor:
+                     except:
+                         combined_map[fd].handle_error()
+ 
++            if notify_sock and notify_sock.fileno() in r:
++                import socket
++                import struct
++                data, ancdata, _, _ = notify_sock.recvmsg(4096, socket.CMSG_SPACE(struct.calcsize("3i")))
++                msg = data.decode("utf-8")
++                for cmsg_level, cmsg_type, cmsg_data in ancdata:
++                    if cmsg_level == socket.SOL_SOCKET and cmsg_type == socket.SCM_CREDENTIALS:
++                        pid, _, _ = struct.unpack("3i", cmsg_data)
++                for group in pgroups:
++                    group.handle_sd_notify(msg, pid)
++
+             for group in pgroups:
+                 group.transition()
+ 
+@@ -358,6 +374,7 @@ def main(args=None, test=False):
+         else:
+             go(options)
+         options.close_httpservers()
++        options.close_notify_socket()
+         options.close_logger()
+         first = False
+         if test or (options.mood < SupervisorStates.RESTARTING):
+diff --git a/supervisor/tests/base.py b/supervisor/tests/base.py
+index f608b2b..96fcf75 100644
+--- a/supervisor/tests/base.py
++++ b/supervisor/tests/base.py
+@@ -32,6 +32,8 @@ class DummyOptions:
+     remove_exception = None
+     write_exception = None
+ 
++    notify_sock = None
++
+     def __init__(self):
+         self.identifier = 'supervisor'
+         self.childlogdir = '/tmp'
+@@ -117,6 +119,9 @@ class DummyOptions:
+     def openhttpservers(self, supervisord):
+         self.httpservers_opened = True
+ 
++    def open_notify_socket(self):
++        pass
++
+     def daemonize(self):
+         self.daemonized = True
+ 
+-- 
+2.39.5
+
