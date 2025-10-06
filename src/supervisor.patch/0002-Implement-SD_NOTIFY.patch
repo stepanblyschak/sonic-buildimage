@@ -1,18 +1,18 @@
-From 3ab7d6f2007188ddce80fa3c1d6196cf888b3051 Mon Sep 17 00:00:00 2001
+From f8f4ff9a2fe6e5f2bf30919d08d7e0a5d7511269 Mon Sep 17 00:00:00 2001
 From: Stepan Blyschak <stepanb@nvidia.com>
-Date: Mon, 29 Sep 2025 14:09:22 +0000
+Date: Mon, 6 Oct 2025 11:58:54 +0300
 Subject: [PATCH] Implement SD_NOTIFY
 
 Signed-off-by: Stepan Blyschak <stepanb@nvidia.com>
 ---
- supervisor/options.py     | 20 ++++++++++++++++++++
+ supervisor/options.py     | 23 +++++++++++++++++++++++
  supervisor/process.py     | 23 +++++++++++++++++++++++
  supervisor/supervisord.py | 17 +++++++++++++++++
  supervisor/tests/base.py  |  5 +++++
- 4 files changed, 65 insertions(+)
+ 4 files changed, 68 insertions(+)
 
 diff --git a/supervisor/options.py b/supervisor/options.py
-index f5cb0c9..49415fb 100644
+index f5cb0c9..e537c97 100644
 --- a/supervisor/options.py
 +++ b/supervisor/options.py
 @@ -410,6 +410,8 @@ class ServerOptions(Options):
@@ -33,17 +33,19 @@ index f5cb0c9..49415fb 100644
          # we need to set a fallback serverurl that process.spawn can use
  
          # prefer a unix domain socket
-@@ -645,6 +649,9 @@ class ServerOptions(Options):
+@@ -645,6 +649,11 @@ class ServerOptions(Options):
          section.identifier = get('identifier', 'supervisor')
          section.nodaemon = boolean(get('nodaemon', 'false'))
          section.silent = boolean(get('silent', 'false'))
 +        section.notify_sock_path = get('notifysock', None)
 +        if section.notify_sock_path is not None:
++            if sys.platform != 'linux':
++                raise ValueError("notifysock is only supported on Linux platform")
 +            section.notify_sock_path = existing_dirpath(section.notify_sock_path)
  
          tempdir = tempfile.gettempdir()
          section.childlogdir = existing_directory(get('childlogdir', tempdir))
-@@ -1246,6 +1253,11 @@ class ServerOptions(Options):
+@@ -1246,6 +1255,12 @@ class ServerOptions(Options):
              # also https://web.archive.org/web/20160729222427/http://www.plope.com/software/collector/253
              server.close()
  
@@ -51,11 +53,12 @@ index f5cb0c9..49415fb 100644
 +        if self.notify_sock is None:
 +            return
 +        self.notify_sock.close()
++        self.notify_sock = None
 +
      def close_logger(self):
          self.logger.close()
  
-@@ -1282,6 +1294,14 @@ class ServerOptions(Options):
+@@ -1282,6 +1297,14 @@ class ServerOptions(Options):
          except ValueError as why:
              self.usage(why.args[0])
  
@@ -203,5 +206,5 @@ index f608b2b..ed795db 100644
          self.daemonized = True
  
 -- 
-2.39.5
+2.48.1
 
