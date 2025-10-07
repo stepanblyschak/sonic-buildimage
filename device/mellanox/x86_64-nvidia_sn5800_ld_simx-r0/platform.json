@@ -102,7 +102,7 @@
                 "name": "sfp1",
                 "thermals": [
                     {
-                        "name": "xSFP module 1 Temp"
+                        "name": "xSFP asic0 module 1 Temp"
                     }
                 ]
             },
@@ -110,7 +110,55 @@
                 "name": "sfp2",
                 "thermals": [
                     {
-                        "name": "xSFP module 2 Temp"
+                        "name": "xSFP asic0 module 2 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp3",
+                "thermals": [
+                    {
+                        "name": "xSFP asic1 module 1 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp4",
+                "thermals": [
+                    {
+                        "name": "xSFP asic1 module 2 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp5",
+                "thermals": [
+                    {
+                        "name": "xSFP asic2 module 1 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp6",
+                "thermals": [
+                    {
+                        "name": "xSFP asic2 module 2 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp7",
+                "thermals": [
+                    {
+                        "name": "xSFP asic3 module 1 Temp"
+                    }
+                ]
+            },
+            {
+                "name": "sfp8",
+                "thermals": [
+                    {
+                        "name": "xSFP asic3 module 2 Temp"
                     }
                 ]
             }

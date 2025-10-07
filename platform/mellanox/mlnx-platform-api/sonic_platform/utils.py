@@ -273,17 +273,12 @@ def extract_RJ45_ports_index():
     return RJ45_port_index_list if bool(RJ45_port_index_list) else None
 
 
-def extract_cpo_ports_index():
-    # Cross check 'platform.json' and 'hwsku.json' to extract the cpo port index if exists.
-    hwsku_path = device_info.get_path_to_hwsku_dir()
-    hwsku_file = os.path.join(hwsku_path, HWSKU_JSON)
-    if not os.path.exists(hwsku_file):
-        # Platforms having no hwsku.json do not have cpo port
+def extract_cpo_ports_index(num_of_asics=1):
+    platform_file = os.path.join(device_info.get_path_to_platform_dir(), device_info.PLATFORM_JSON_FILE)
+    if not os.path.exists(platform_file):
         return None
 
-    platform_file = device_info.get_path_to_port_config_file()
     platform_dict = load_json_file(platform_file)['interfaces']
-    hwsku_dict = load_json_file(hwsku_file)['interfaces']
     port_name_to_index_map_dict = {}
     cpo_port_index_list = []
 
@@ -298,6 +293,11 @@ def extract_cpo_ports_index():
     if not bool(port_name_to_index_map_dict):
         return None
 
+    hwsku_jsons = get_path_list_to_asic_hwsku_dir(num_of_asics)
+    hwsku_dict = {}
+    for hwsku_json in hwsku_jsons:
+        hwsku_dict.update(load_json_file(hwsku_json)['interfaces'])
+
     # Check if "port_type" specified as "CPO", if yes, add the port index to the list.
     for i, (key, value) in enumerate(hwsku_dict.items()):
         if key in port_name_to_index_map_dict and PORT_TYPE_KEY in value and value[PORT_TYPE_KEY] == CPO_PORT_TYPE:
@@ -307,6 +307,35 @@ def extract_cpo_ports_index():
     cpo_port_index_list = list(dict.fromkeys(cpo_port_index_list))
 
     return cpo_port_index_list if cpo_port_index_list else None
+
+
+def extract_asic_id_map(num_of_asics=1):
+    asic_id_map = {}
+
+    hwsku_jsons = get_path_list_to_asic_hwsku_dir(num_of_asics)
+    interface2asic = {}
+    for asic_id, hwsku_json in enumerate(hwsku_jsons):
+        interface2asic.update({interface: asic_id for interface in load_json_file(hwsku_json)['interfaces'].keys()})
+
+    platform_file = os.path.join(device_info.get_path_to_platform_dir(), device_info.PLATFORM_JSON_FILE)
+    platform_dict = load_json_file(platform_file)['interfaces']
+
+    for inteface, value in platform_dict.items():
+        if PORT_INDEX_KEY in value:
+            index_raw = value[PORT_INDEX_KEY]
+            # The index could be "1" or "1, 1, 1, 1"
+            index = index_raw.split(',')[0]
+            asic_id_map[int(index)-1] = interface2asic[inteface]
+    return asic_id_map
+
+
+def get_path_list_to_asic_hwsku_dir(num_of_asics):
+    platform_path = device_info.get_path_to_platform_dir()
+    hwsku = device_info.get_hwsku()
+    if num_of_asics == 1:
+        return [os.path.join(platform_path, hwsku, HWSKU_JSON)]
+    else:
+        return [os.path.join(platform_path, hwsku, str(asic_id), HWSKU_JSON) for asic_id in range(num_of_asics)]
 
 
 def wait_until(predict, timeout, interval=1, *args, **kwargs):

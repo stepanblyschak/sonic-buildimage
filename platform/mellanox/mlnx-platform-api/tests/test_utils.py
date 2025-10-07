@@ -238,8 +238,9 @@ class TestUtils:
             ),
         ]
     )
-    @mock.patch('sonic_py_common.device_info.get_path_to_port_config_file', mock.MagicMock(return_value='platform.json'))
+    @mock.patch('sonic_py_common.device_info.get_path_to_platform_dir', mock.MagicMock(return_value='.'))
     @mock.patch('sonic_py_common.device_info.get_path_to_hwsku_dir', mock.MagicMock(return_value='/tmp'))
+    @mock.patch('sonic_py_common.device_info.get_hwsku', mock.MagicMock(return_value=''))
     @mock.patch('sonic_platform.utils.load_json_file')
     @mock.patch('os.path.exists')
     def test_extract_cpo_ports_index(self, mock_exists, mock_load_json, mock_exists_value, platform_json, hwsku_json, expected_result):
