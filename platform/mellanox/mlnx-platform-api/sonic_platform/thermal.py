@@ -76,7 +76,7 @@ THERMAL_NAMING_RULE = {
     },
     "chassis thermals": [
         {
-            "name": "ASIC {} Temp",
+            "name": "ASIC{}",
             "temperature": "input",
             "high_threshold_default": 105,
             "high_critical_threshold_default": 120,
@@ -180,9 +180,10 @@ def initialize_chassis_thermals():
                 position += len(discrete_thermals)
                 thermal_list.extend(discrete_thermals)
         elif thermal_type == 'asic_indexable':
+            is_multi_asic = DeviceDataManager.is_multi_asic_platform()
             asic_count = DeviceDataManager.get_asic_count()
             for asic_index in range(asic_count):
-                thermal_list.append(create_asic_thermal(rule, asic_index, position))
+                thermal_list.append(create_asic_thermal(rule, asic_index, position, is_multi_asic))
                 position += 1
         else:
             thermal_object = create_single_thermal(rule, CHASSIS_THERMAL_SYSFS_FOLDER, position)
@@ -192,19 +193,21 @@ def initialize_chassis_thermals():
     return thermal_list
 
 
-def create_asic_thermal(rule, asic_index, position):
+def create_asic_thermal(rule, asic_index, position, is_multi_asic):
     """Create thermal object for a specific ASIC
 
     Args:
         rule (dict): Thermal rule
         asic_index (int): ASIC index (0-based)
         position (int): Position in thermal list
+        is_multi_asic (bool): Whether the platform is multi ASIC
 
     Returns:
         Thermal: ASIC thermal object
     """
     rule = copy.deepcopy(rule)
-    rule['name'] = rule['name'].format(asic_index)
+    name_format = asic_index if is_multi_asic else ''
+    rule['name'] = rule['name'].format(name_format)
     rule['sysfs_folder'] = rule['sysfs_folder'].format(asic_index)
     return create_single_thermal(rule, rule['sysfs_folder'], position)
 
