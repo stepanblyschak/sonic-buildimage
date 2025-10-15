@@ -19,6 +19,8 @@ pub enum Error {
     Join(#[from] tokio::task::JoinError),
     #[error("Device info error")]
     DeviceInfo(#[from] sonic_rs_common::device_info::DeviceInfoError),
+    #[error("SWSS common error")]
+    SwssError(#[from] swss_common::Exception),
 }
 
 pub trait DockerApi: Send + Sync {
@@ -84,7 +86,8 @@ pub async fn wait_for_container(
         info!("No longer waiting on container '{}'", container_name);
 
         if dependent_services.contains(&container_name) {
-            let warm_restart = device_info::is_warm_restart_enabled(&container_name)?;
+            let (service_name, namespace) = parse_container_name(&container_name);
+            let warm_restart = device_info::is_warm_restart_enabled_in_namespace(service_name, &namespace)?;
             let fast_reboot = device_info::is_fast_reboot_enabled()?;
 
             if warm_restart || fast_reboot {
@@ -94,6 +97,18 @@ pub async fn wait_for_container(
 
         exit_event.store(true, Ordering::Release);
         return Ok(());
+    }
+}
+
+fn parse_container_name(container_name: &str) -> (&str, String) {
+    match container_name.find(|c: char| c.is_digit(10)) {
+        Some(index) => {
+            let (service_name, namespace) = container_name.split_at(index);
+            (service_name, format!("asic{}", namespace))
+        }
+        None => {
+            (container_name, "".to_string())
+        }
     }
 }
 
