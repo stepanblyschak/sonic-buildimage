@@ -1,9 +1,13 @@
 #! /bin/bash
 
-VERBOSE=no
+VERBOSE=${VERBOSE:-no}
 
 # read SONiC immutable variables
 [ -f /etc/sonic/sonic-environment ] && . /etc/sonic/sonic-environment
+PLATFORM=${PLATFORM:-`sonic-cfggen -H -v DEVICE_METADATA.localhost.platform`}
+
+[ -f /usr/share/sonic/device/$PLATFORM/asic.conf ] && . /usr/share/sonic/device/$PLATFORM/asic.conf
+NUM_ASIC=${NUM_ASIC:-1}
 
 # Define components that needs to reconcile during warm
 # boot:
@@ -29,13 +33,17 @@ ASSISTANT_SCRIPT="/usr/local/bin/neighbor_advertiser"
 
 function debug()
 {
-    /usr/bin/logger "WARMBOOT_FINALIZER : $1"
-    if [[ x"${VERBOSE}" == x"yes" ]]; then
-        echo `date` "- $1"
+    local message="$1"
+    if [[ -n $DEV ]]; then
+        message="asic$DEV: $message"
     fi
+    if [[ x"${VERBOSE}" == x"yes" ]]; then
+        echo `date` "- $message"
+    fi
+    /usr/bin/logger "WARMBOOT_FINALIZER : $message"
 }
 
-
+# TODO(stepanb): support ASIC scoped and globally scoped components
 function get_component_list()
 {
     SVC_LIST=${!RECONCILE_COMPONENTS[@]}
@@ -52,13 +60,13 @@ function get_component_list()
 
 function check_warm_boot()
 {
-    WARM_BOOT=`sonic-db-cli STATE_DB hget "WARM_RESTART_ENABLE_TABLE|system" enable`
+    WARM_BOOT=`sonic-db-cli -n "$NETNS" STATE_DB hget "WARM_RESTART_ENABLE_TABLE|system" enable`
 }
 
 function check_fast_reboot()
 {
     debug "Checking if fast-reboot is enabled..."
-    FAST_REBOOT=`sonic-db-cli STATE_DB hget "FAST_RESTART_ENABLE_TABLE|system" enable`
+    FAST_REBOOT=`sonic-db-cli -n "$NETNS" STATE_DB hget "FAST_RESTART_ENABLE_TABLE|system" enable`
     if [[ x"${FAST_REBOOT}" == x"true" ]]; then
        debug "Fast-reboot is enabled..."
     else
@@ -72,12 +80,12 @@ function wait_for_database_service()
     debug "Wait for database to become ready..."
 
     # Wait for redis server start before database clean
-    until [[ $(sonic-db-cli PING | grep -c PONG) -gt 0 ]]; do
+    until [[ $(sonic-db-cli -n "$NETNS" PING | grep -c PONG) -gt 0 ]]; do
       sleep 1;
     done
 
     # Wait for configDB initialization
-    until [[ $(sonic-db-cli CONFIG_DB GET "CONFIG_DB_INITIALIZED") -eq 1 ]];
+    until [[ $(sonic-db-cli -n "$NETNS" CONFIG_DB GET "CONFIG_DB_INITIALIZED") -eq 1 ]];
         do sleep 1;
     done
 
@@ -87,7 +95,7 @@ function wait_for_database_service()
 
 function get_component_state()
 {
-    sonic-db-cli STATE_DB hget "WARM_RESTART_TABLE|$1" state
+    sonic-db-cli -n "$NETNS" STATE_DB hget "WARM_RESTART_TABLE|$1" state
 }
 
 
@@ -111,7 +119,7 @@ function set_cpufreq_governor() {
         || debug "Failed to set CPUFreq scaling governor to $governor"
 }
 
-function finalize_common() {
+function finalize_global() {
     local -r asic_type=${ASIC_TYPE:-`sonic-cfggen -y /etc/sonic/sonic_version.yml -v asic_type`}
 
     if [[ "$asic_type" == "mellanox" ]]; then
@@ -124,16 +132,14 @@ function finalize_common() {
 function finalize_warm_boot()
 {
     debug "Finalizing warmboot..."
-    finalize_common
     sudo config warm_restart disable
 }
 
 function finalize_fast_reboot()
 {
     debug "Finalizing fast-reboot..."
-    finalize_common
-    sonic-db-cli STATE_DB hset "FAST_RESTART_ENABLE_TABLE|system" "enable" "false" &>/dev/null
-    sonic-db-cli CONFIG_DB DEL "WARM_RESTART|teamd" &>/dev/null
+    sonic-db-cli -n "$NETNS" STATE_DB hset "FAST_RESTART_ENABLE_TABLE|system" "enable" "false" &>/dev/null
+    sonic-db-cli -n "$NETNS" CONFIG_DB DEL "WARM_RESTART|teamd" &>/dev/null
 }
 
 function stop_control_plane_assistant()
@@ -155,54 +161,76 @@ function restore_counters_folder()
     fi
 }
 
+function check_warm_boot_and_fast_boot_or_exit()
+{
+    check_fast_reboot
+    check_warm_boot
+    if [[ x"${WARM_BOOT}" != x"true" ]]; then
+        debug "warmboot is not enabled ..."
+        if [[ x"${FAST_REBOOT}" != x"true" ]]; then
+            debug "fastboot is not enabled ..."
+            exit 0
+        fi
+    fi
+}
+
+function wait_and_finalize() {
+    debug "Waiting for components: '${COMPONENT_LIST}' to reconcile ..."
+
+    list=${COMPONENT_LIST}
+
+    # Wait up to 5 minutes
+    for i in `seq 60`; do
+        list=`check_list ${list}`
+        debug "Waiting for components to reconcile: ${list}"
+        if [[ -z "${list}" ]]; then
+            break
+        fi
+        sleep 5
+    done
+
+    if [[ -n "${list}" ]]; then
+        debug "Some components didn't finish reconcile: ${list} ..."
+    fi
+
+    if [ x"${FAST_REBOOT}" == x"true" ]; then
+        finalize_fast_reboot
+    fi
+
+    if [ x"${WARM_BOOT}" == x"true" ]; then
+        finalize_warm_boot
+    fi
+}
 
 wait_for_database_service
 
-check_fast_reboot
-check_warm_boot
+check_warm_boot_and_fast_boot_or_exit
 
-if [[ x"${WARM_BOOT}" != x"true" ]]; then
-    debug "warmboot is not enabled ..."
-    if [[ x"${FAST_REBOOT}" != x"true" ]]; then
-	    debug "fastboot is not enabled ..."
-	    exit 0
-    fi
-fi
+get_component_list
 
 if [[ (x"${WARM_BOOT}" == x"true") && (x"${FAST_REBOOT}" != x"true") ]]; then
     restore_counters_folder
 fi
 
-get_component_list
-
-debug "Waiting for components: '${COMPONENT_LIST}' to reconcile ..."
-
-list=${COMPONENT_LIST}
-
-# Wait up to 5 minutes
-for i in `seq 60`; do
-    list=`check_list ${list}`
-    if [[ -z "${list}" ]]; then
-        break
-    fi
-    sleep 5
-done
+if [[ $NUM_ASIC -eq 1 ]]; then
+    wait_and_finalize
+else
+    for dev in `seq 0 $((NUM_ASIC - 1))`; do
+        ( 
+            DEV=$dev NETNS=asic$dev
+            wait_for_database_service
+            check_warm_boot_and_fast_boot_or_exit
+            wait_and_finalize
+        ) &
+    done
+    wait
+fi
 
 if [[ (x"${WARM_BOOT}" == x"true") && (x"${FAST_REBOOT}" != x"true") ]]; then
-   stop_control_plane_assistant
+    stop_control_plane_assistant
 fi
 
-if [[ -n "${list}" ]]; then
-    debug "Some components didn't finish reconcile: ${list} ..."
-fi
-
-if [ x"${FAST_REBOOT}" == x"true" ]; then
-    finalize_fast_reboot
-fi
-
-if [ x"${WARM_BOOT}" == x"true" ]; then
-    finalize_warm_boot
-fi
+finalize_global
 
 # Save DB after stopped control plane assistant to avoid extra entries
 debug "Save in-memory database after warm/fast reboot ..."
