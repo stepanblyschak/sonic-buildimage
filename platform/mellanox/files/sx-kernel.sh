@@ -49,8 +49,34 @@ if [ ! -x "$SXDKERNEL_INIT" ]; then
     exit 1
 fi
 
+function getBootType()
+{
+    case "$(cat /proc/cmdline)" in
+    *SONIC_BOOT_TYPE=warm*)
+        TYPE='warm'
+        ;;
+    *SONIC_BOOT_TYPE=fastfast*)
+        TYPE='fastfast'
+        ;;
+    *SONIC_BOOT_TYPE=express*)
+        TYPE='express'
+        ;;
+    *SONIC_BOOT_TYPE=fast*|*fast-reboot*)
+        TYPE='fast'
+        ;;
+    *)
+        TYPE='cold'
+    esac
+    echo "${TYPE}"
+}
+
 start() {
-    echo "Starting SX kernel driver PREDEFINED_DEV_PCI_BUS=${PREDEFINED_DEV_PCI_BUS} ..."
+    BOOT_TYPE=`getBootType`
+    if [[ x"$BOOT_TYPE" == x"warm" || x"$BOOT_TYPE" == x"fastfast" || x"$BOOT_TYPE" == x"fast" ]]; then
+        export FAST_BOOT=1
+    fi
+
+    echo "Starting SX kernel driver PREDEFINED_DEV_PCI_BUS=${PREDEFINED_DEV_PCI_BUS} BOOT_TYPE: $BOOT_TYPE ..."
     $SXDKERNEL_INIT start
 }
 
