@@ -71,7 +71,16 @@ function startplatform() {
 
         debug "BOOT_TYPE: $BOOT_TYPE WARM_BOOT: $WARM_BOOT FAST_BOOT: $FAST_BOOT"
 
-        debug "Starting Firmware update procedure"
+        local fw_upgrade_args="--status=all"
+        if [[ $DEV != "" ]]; then
+            fw_upgrade_args="--status=$DEV"
+        fi
+        mlnx-fw-manager $fw_upgrade_args
+        if [[ $? != "0" ]]; then
+            debug "ASIC$DEV firmware upgrade status check failed. Please check the firmware upgrade status manually."
+            exit 1
+        fi
+
         reset_mellanox_drivers
 
         if ! echo "mlx_sx_core_restart_required" > /var/run/mlx_sx_core_restart_required$DEV 2>/dev/null; then

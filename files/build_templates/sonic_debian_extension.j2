@@ -280,6 +280,10 @@ install_deb_package $debs_path/{{pkgname}}
 fi
 {% endfor %}
 
+{% for wheel in installer_python_wheels.strip().split(' ') -%}
+install_pip_package {{wheel}}
+{% endfor %}
+
 # Install SONiC Device Data  (and its dependencies via 'apt-get -y install -f')
 install_deb_package $debs_path/sonic-device-data_*.deb
 
@@ -1113,8 +1117,6 @@ sudo chmod 755 $FILESYSTEM_ROOT/usr/bin/get_component_versions.py
 
 sudo cp platform/mellanox/cmis_host_mgmt/cmis_host_mgmt.py $FILESYSTEM_ROOT/usr/bin/cmis_host_mgmt.py
 sudo chmod 755 $FILESYSTEM_ROOT/usr/bin/cmis_host_mgmt.py
-j2 platform/mellanox/mlnx-fw-upgrade.j2 | sudo tee $FILESYSTEM_ROOT/usr/bin/mlnx-fw-upgrade.sh
-sudo chmod 755 $FILESYSTEM_ROOT/usr/bin/mlnx-fw-upgrade.sh
 sudo cp -r platform/mellanox/asic_detect $FILESYSTEM_ROOT/usr/bin/asic_detect
 sudo chmod -R 777 $FILESYSTEM_ROOT/usr/bin/asic_detect/
 
@@ -1163,8 +1165,6 @@ done
 
 sudo install -m 755 platform/nvidia-bluefield/byo/sonic-byo.py $FILESYSTEM_ROOT/usr/bin/sonic-byo.py
 sudo install -m 755 platform/nvidia-bluefield/nasa-cli-helper/nasa-cli-helper.py $FILESYSTEM_ROOT/usr/bin/nasa-cli-helper.py
-SONIC_PLATFORM={{sonic_asic_platform}} j2 platform/mellanox/mlnx-fw-upgrade.j2 | sudo tee $FILESYSTEM_ROOT/usr/bin/mlnx-fw-upgrade.sh
-sudo chmod 755 $FILESYSTEM_ROOT/usr/bin/mlnx-fw-upgrade.sh
 sudo cp -r platform/mellanox/asic_detect $FILESYSTEM_ROOT/usr/bin/asic_detect
 sudo chmod -R 777 $FILESYSTEM_ROOT/usr/bin/asic_detect/
 
