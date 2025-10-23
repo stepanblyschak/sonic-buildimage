@@ -221,9 +221,6 @@ class FirmwareCoordinator:
         if not next_image:
             raise FirmwareUpgradeError("No next SONiC image found")
 
-        if current_image == next_image:
-            raise FirmwareUpgradeError("No next SONiC image found")
-
         platform_fw_path = f"/host/image-{next_image.replace('SONiC-OS-', '')}/platform/fw/asic/"
 
         if os.path.exists(platform_fw_path):
