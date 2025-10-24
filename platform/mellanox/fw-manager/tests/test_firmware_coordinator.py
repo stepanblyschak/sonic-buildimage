@@ -379,8 +379,9 @@ class TestFirmwareCoordinator(unittest.TestCase):
     @patch('mellanox_fw_manager.firmware_coordinator.AsicManager')
     @patch('mellanox_fw_manager.fw_manager.create_firmware_manager')
     @patch('mellanox_fw_manager.firmware_coordinator.subprocess.run')
-    def test_get_image_firmware_path_current_equals_next(self, mock_run, mock_create_manager, mock_asic_manager, mock_detect_platform):
-        """Test _get_image_firmware_path when current equals next image (lines 228-229)"""
+    @patch('mellanox_fw_manager.firmware_coordinator.os.path.exists')
+    def test_get_image_firmware_path_current_equals_next(self, mock_exists, mock_run, mock_create_manager, mock_asic_manager, mock_detect_platform):
+        """Test _get_image_firmware_path when current equals next image - should proceed normally"""
         mock_detect_platform.return_value = "test-platform"
         mock_asic_manager.return_value.get_asic_count.return_value = 0
         mock_asic_manager.return_value.get_asic_pci_ids.return_value = []
@@ -390,10 +391,12 @@ class TestFirmwareCoordinator(unittest.TestCase):
             stdout="Current: SONiC-OS-202301.01\nNext: SONiC-OS-202301.01"
         )
 
-        with self.assertRaises(FirmwareUpgradeError) as context:
-            FirmwareCoordinator(from_image=True)
+        mock_exists.return_value = True
 
-        self.assertIn("No next SONiC image found", str(context.exception))
+        coordinator = FirmwareCoordinator(from_image=True)
+
+        expected_path = "/host/image-202301.01/platform/fw/asic/"
+        self.assertEqual(coordinator.fw_bin_path, expected_path)
 
     @patch('mellanox_fw_manager.firmware_coordinator._detect_platform')
     @patch('mellanox_fw_manager.firmware_coordinator.AsicManager')
