@@ -179,9 +179,7 @@ function stopplatform2() {
     # platform specific tasks
 
      if [[ x"$WARM_BOOT" != x"true" ]]; then
-        if [ x$sonic_asic_platform == x'mellanox' ]; then
-            reset_mellanox_drivers
-        elif [ x"$sonic_asic_platform" == x"nvidia-bluefield" ]; then
+         if [ x"$sonic_asic_platform" == x"nvidia-bluefield" ]; then
              /usr/bin/bfnet.sh stop
          fi
      fi
