@@ -33,7 +33,12 @@ struct Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let identity = CString::new("docker-wait-any-rs").unwrap();
+    const DEFAULT_DATABASE_GLOBAL_CONFIG_PATH: &'static str = "/var/run/redis/sonic-db/database_global.json";
+    if std::path::Path::new(DEFAULT_DATABASE_GLOBAL_CONFIG_PATH).exists() {
+        swss_common::sonic_db_config_initialize_global(DEFAULT_DATABASE_GLOBAL_CONFIG_PATH, true)?;
+    }
+
+    let identity = CString::new("docker-wait-any-rs").expect("CString::new failed");
     let syslog = syslog_tracing::Syslog::new(
         identity,
         syslog_tracing::Options::LOG_PID,
