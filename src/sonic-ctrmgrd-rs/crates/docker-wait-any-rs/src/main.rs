@@ -37,13 +37,13 @@ async fn main() -> Result<(), Error> {
     if std::path::Path::new(DEFAULT_DATABASE_GLOBAL_CONFIG_PATH).exists() {
         swss_common::sonic_db_config_initialize_global(DEFAULT_DATABASE_GLOBAL_CONFIG_PATH, true)?;
     }
-
-    let identity = CString::new("docker-wait-any-rs").expect("CString::new failed");
+    let identity = CString::new("docker-wait-any-rs")
+        .map_err(|e| Error::Syslog(format!("invalid identity string: {}", e)))?;
     let syslog = syslog_tracing::Syslog::new(
         identity,
         syslog_tracing::Options::LOG_PID,
         syslog_tracing::Facility::Daemon
-    ).unwrap();
+    ).ok_or_else(|| Error::Syslog("failed to initialize syslog".to_string()))?;
     tracing_subscriber::fmt()
         .with_writer(syslog)
         .with_ansi(false)

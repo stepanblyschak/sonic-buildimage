@@ -21,6 +21,8 @@ pub enum Error {
     DeviceInfo(#[from] sonic_rs_common::device_info::DeviceInfoError),
     #[error("SWSS common error")]
     SwssError(#[from] swss_common::Exception),
+    #[error("Syslog initialization error: {0}")]
+    Syslog(String),
 }
 
 pub trait DockerApi: Send + Sync {
